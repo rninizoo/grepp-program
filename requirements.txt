@@ -3,3 +3,5 @@ uvicorn[standard]
 sqlmodel
 psycopg2-binary
 pydantic-settings
+passlib[bcrypt]
+python-jose[cryptography]
