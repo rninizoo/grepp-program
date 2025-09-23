@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta, timezone
-from http.client import HTTPException
 
 from fastapi import HTTPException, status
 from jose import JWTError, jwt

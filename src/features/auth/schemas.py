@@ -1,5 +1,6 @@
 from sqlmodel import SQLModel
 
+
 class UserSignIn(SQLModel):
     email: str
     password: str
