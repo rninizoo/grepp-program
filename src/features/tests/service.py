@@ -1,10 +1,11 @@
 from datetime import datetime, timezone
 
 from fastapi import HTTPException
-from sqlmodel import Session, select
+from fastapi.params import Depends
+from sqlmodel import Session, asc, desc, select
 
 from ...entities.tests import Test
-from .schemas import TestCreate, TestRead, TestUpdate
+from .schemas import TestCreate, TestQueryOpts, TestRead, TestUpdate
 
 
 def create_test(test_create: TestCreate, actant_id: int,session: Session) -> Test:
@@ -27,8 +28,23 @@ def create_test(test_create: TestCreate, actant_id: int,session: Session) -> Tes
     session.refresh(test)
     return test
 
-def find_tests(session: Session, skip: int, limit: int) -> list[TestRead]:
-    tests = session.exec(select(Test).where(Test.isDestroyed.is_(False)).offset(skip).limit(limit)).all()
+def find_tests(session: Session, skip: int, limit: int, query_opts: TestQueryOpts = Depends()) -> list[TestRead]:
+    stmt = select(Test).where(Test.isDestroyed.is_(False))
+
+    # status 필터링
+    if query_opts.status:
+        stmt = stmt.where(Test.status == query_opts.status)
+
+    # 정렬 created | popular
+    if query_opts.sort == "created":
+        stmt = stmt.order_by(asc(Test.createdAt))
+    elif query_opts.sort == "popular":
+        stmt = stmt.order_by(desc(Test.examineeCount))
+
+    # offset, limit
+    stmt = stmt.offset(skip).limit(limit)
+
+    tests = session.exec(stmt).all()
     return [TestRead.model_validate(test) for test in tests]
 
 def update_test(test_id: int, test_update: TestUpdate, actant_id :int, session: Session) -> TestRead:

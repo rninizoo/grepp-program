@@ -1,9 +1,14 @@
 from datetime import datetime
+from typing import Literal
 
 from sqlmodel import SQLModel
 
 from ...entities.tests import TestStatusEnum
 
+
+class TestQueryOpts(SQLModel):
+    status: str = "AVAILABLE"
+    sort: Literal["created", "popular"] = "created"
 
 class TestCreate(SQLModel):
     title: str
