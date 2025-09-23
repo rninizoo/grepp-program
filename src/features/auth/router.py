@@ -11,11 +11,11 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 security = HTTPBearer()
 
 @router.post("/signup", response_model=UserRead)
-def createUser(user_create: UserCreate, session: Session = Depends(get_session)):
+def signup(user_create: UserCreate, session: Session = Depends(get_session)):
     return service.signUp(user_create=user_create, session=session)
 
 @router.post("/login", response_model=UserSignInRead)
-def getUsers(user_signIn: UserSignIn, session: Session = Depends(get_session)):
+def login(user_signIn: UserSignIn, session: Session = Depends(get_session)):
     return service.signIn(user_signIn=user_signIn, session=session)
 
 @router.get("/my", response_model=UserRead)
