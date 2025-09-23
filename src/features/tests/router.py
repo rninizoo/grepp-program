@@ -1,4 +1,4 @@
-from typing import List, Literal
+from typing import Literal
 
 from fastapi import APIRouter, Body, Depends, Query
 from sqlmodel import Session

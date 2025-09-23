@@ -14,6 +14,9 @@ def create_test(test_create: TestCreate, actant_id: int,session: Session) -> Tes
     if existing_test:
         raise HTTPException(status_code=409, detail="Test already registered")
 
+    if test_create.startAt >= test_create.endAt:
+        raise HTTPException(status_code=400, detail="Cannot create this test on startAt with endAt")
+
     test = Test(
         title=test_create.title,
         description=test_create.description,
@@ -53,11 +56,11 @@ def update_test(test_id: int, test_update: TestUpdate, actant_id :int, session: 
     test = session.exec(stmt).one_or_none()
 
     # 존재여부 체크
-    if not test or test.isDestroyed :
+    if not test or test.isDestroyed:
         raise HTTPException(status_code=404, detail="Test not found")
 
     # 존재여부 시작일, 종료일 체크
-    if test.startAt > test.endAt:
+    if test.startAt >= test.endAt:
         raise HTTPException(status_code=400, detail="Cannot update this test on startAt with endAt")
 
     # 작성자만 변경 가능
