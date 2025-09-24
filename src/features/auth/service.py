@@ -1,26 +1,32 @@
+from fastapi import HTTPException
 from sqlmodel import Session
 
 from ...entities.users import User
 from ...features.users.schemas import UserCreate, UserRead
-from ...shared.security import authenticate, createAccessToken
-from ..users.service import createUser, findUserByEmail
+from ...shared.security import authenticate, create_access_token, verify_password
+from ..users.service import create_user, find_user_by_email
 from .schemas import UserSignIn, UserSignInRead
 
 
-def signUp(user_create: UserCreate, session: Session) -> User:
-    new_user = createUser(user_create=user_create, session=session)
+def sign_up(user_create: UserCreate, session: Session) -> User:
+    # TODO: email 형식 validation
+    new_user = create_user(user_create=user_create, session=session)
 
     return new_user
 
-def signIn(user_signIn: UserSignIn, session: Session) -> UserSignInRead:
-      found_user = findUserByEmail(email=user_signIn.email, session=session)
-      print(user_signIn, found_user)
+def sign_in(user_signIn: UserSignIn, session: Session) -> UserSignInRead:
+    found_user = find_user_by_email(email=user_signIn.email, session=session)
+    if not found_user:
+        raise HTTPException(status_code=404, detail="User Not Registered")
 
-      access_token = createAccessToken(data={"sub":found_user.email, "username": found_user.username, "id": found_user.id, "isDestroyed": found_user.isDestroyed })
+    if not verify_password(user_signIn.password, found_user.password):
+        raise HTTPException(status_code=401, detail="Invalid password")
 
-      return {"accessToken": access_token}
+    access_token = create_access_token(data={"sub":found_user.email, "username": found_user.username, "id": found_user.id, "isDestroyed": found_user.isDestroyed })
 
-def getMyInfo(access_token: str) -> UserRead:
+    return {"accessToken": access_token}
+
+def get_my_info(access_token: str) -> UserRead:
      token = authenticate(access_token=access_token)
      return {
         "id": token["id"],

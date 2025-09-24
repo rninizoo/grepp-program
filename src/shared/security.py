@@ -1,22 +1,25 @@
 from datetime import datetime, timedelta, timezone
 
-from fastapi import HTTPException, status
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
+from ..features.users.schemas import UserRead
 from .config import settings
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+security = HTTPBearer()
 
 
-def hashPassword(password: str) -> str:
+def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
-def verifyPassword(plain_password: str, hashed_password: str) -> bool:
+def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 
-def createAccessToken(data: dict, expires_delta: timedelta | None = None) -> str:
+def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
@@ -48,3 +51,14 @@ def authenticate(access_token: str) -> dict:
         raise credentials_exception
 
     return payload
+
+def authenticate_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> UserRead:
+    token = credentials.credentials
+    decoded = authenticate(token)
+
+    return {
+        "id": decoded["id"],
+        "username": decoded["username"],
+        "email": decoded["sub"],
+        "isDestroyed": decoded["isDestroyed"]
+    }
