@@ -1,7 +1,6 @@
-from fastapi import FastAPI  # noqa: I001
+from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from sqlmodel import SQLModel
-
 
 from ..features.auth.router import router as auth_router
 from ..features.courses.router import router as course_router
