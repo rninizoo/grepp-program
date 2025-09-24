@@ -19,7 +19,7 @@ def create_user(user_create: UserCreate, session: Session) -> User:
     db_user = User(**user_data, password=hashed_password)
 
     session.add(db_user)
-    session.commit()
+    session.flush()
     session.refresh(db_user)
     return db_user
 

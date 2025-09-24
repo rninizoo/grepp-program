@@ -27,7 +27,7 @@ def create_course(course_create: CourseCreate, actant_id: int,session: Session) 
     )
 
     session.add(course)
-    session.commit()
+    session.flush()
     session.refresh(course)
     return course
 
@@ -60,7 +60,7 @@ def update_course(course_id: int, course_update: CourseUpdate, actant_id :int, s
         raise HTTPException(status_code=404, detail="Course not found")
 
     # 존재여부 시작일, 종료일 체크
-    if course.startAt >= course.endAt:
+    if course_update.startAt >= course_update.endAt:
         raise HTTPException(status_code=400, detail="Cannot update this course on startAt with endAt")
 
     # 작성자만 변경 가능
@@ -74,7 +74,7 @@ def update_course(course_id: int, course_update: CourseUpdate, actant_id :int, s
 
     course.updatedAt = datetime.now(timezone.utc)
     session.add(course)
-    session.commit()
+    session.flush()
     session.refresh(course)
 
     return CourseRead.model_validate(course)

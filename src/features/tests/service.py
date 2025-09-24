@@ -27,7 +27,7 @@ def create_test(test_create: TestCreate, actant_id: int,session: Session) -> Tes
     )
 
     session.add(test)
-    session.commit()
+    session.flush()
     session.refresh(test)
     return test
 
@@ -60,7 +60,7 @@ def update_test(test_id: int, test_update: TestUpdate, actant_id :int, session: 
         raise HTTPException(status_code=404, detail="Test not found")
 
     # 존재여부 시작일, 종료일 체크
-    if test.startAt >= test.endAt:
+    if test_update.startAt >= test_update.endAt:
         raise HTTPException(status_code=400, detail="Cannot update this test on startAt with endAt")
 
     # 작성자만 변경 가능
@@ -74,7 +74,7 @@ def update_test(test_id: int, test_update: TestUpdate, actant_id :int, session: 
 
     test.updatedAt = datetime.now(timezone.utc)
     session.add(test)
-    session.commit()
+    session.flush()
     session.refresh(test)
 
     return TestRead.model_validate(test)
