@@ -16,6 +16,7 @@ class CourseCreate(SQLModel):
     startAt: datetime
     endAt: datetime
     status: CourseStatusEnum
+    cost: int
 
 
 class CourseUpdate(SQLModel):
@@ -25,6 +26,7 @@ class CourseUpdate(SQLModel):
     startAt: datetime  | None
     endAt: datetime | None
     status: CourseStatusEnum | None
+    cost: int | None
     isDestroyed: bool | None
 
 class CourseRead(SQLModel):
@@ -34,8 +36,9 @@ class CourseRead(SQLModel):
     startAt: datetime
     endAt: datetime
     status: CourseStatusEnum
-    isDestroyed: bool
     createdAt: datetime
     updatedAt: datetime
+    cost: int
     studentCount: int
     actantId: int
+    isDestroyed: bool

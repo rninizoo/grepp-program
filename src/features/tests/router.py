@@ -25,4 +25,8 @@ def create_test(current_user: UserRead = Depends(authenticate_token), test_creat
 def update_test(test_id: int, test_update: TestUpdate = Body(...), current_user: UserRead = Depends(authenticate_token), session: Session = Depends(get_session)):
     return service.update_test(test_id=test_id, test_update=test_update, actant_id=current_user["id"], session=session)
 
+@router.post("/{test_id}/apply")
+def apply_test_endpoint(test_id: int, current_user: UserRead = Depends(authenticate_token), session: Session = Depends(get_session)):
+    return service.apply_test(test_id=test_id, actant_id = current_user["id"], session=session)
+
 

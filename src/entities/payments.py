@@ -15,6 +15,10 @@ class PaymentMethodEnum(str, Enum):
     BANK = "BANK"
     CARD = "CARD"
 
+class PaymentTargetTypeEnum(str, Enum):
+    TEST = "TEST"
+    COURSE = "COURSE"
+
 class Payment(SQLModel, table=True):
     __tablename__ = "payments"
 
@@ -22,10 +26,10 @@ class Payment(SQLModel, table=True):
     userId: int = Field(foreign_key="user.id", nullable=False)
 
     amount: int = Field(nullable=False)  # 단위: KRW
-    method: PaymentMethodEnum = Field(nullable=False)
+    method: PaymentMethodEnum = Field(nullable=True)
     status: PaymentStatusEnum = Field(nullable=False)
 
-    targetType: str = Field(nullable=False)  # exam, course 등
+    targetType: PaymentTargetTypeEnum = Field(nullable=False)
     targetId: str = Field(nullable=False)
     title: str = Field(nullable=False)
 

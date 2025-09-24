@@ -29,5 +29,6 @@ class Course(BaseModel, table=True):
     )
     actantId: int = Field(foreign_key="user.id", nullable=False)
     status: CourseStatusEnum = Field(nullable=False)
+    cost: int = Field(nullable=False)
     studentCount: int = Field(default=0)
     isDestroyed: bool = Field(default=False, nullable=False)

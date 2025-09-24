@@ -29,5 +29,6 @@ class Test(BaseModel, table=True):
     )
     actantId: int = Field(foreign_key="user.id", nullable=False)
     status: TestStatusEnum = Field(nullable=False)
+    cost: int = Field(nullable=False)
     examineeCount: int = Field(default=0)
     isDestroyed: bool = Field(default=False, nullable=False)

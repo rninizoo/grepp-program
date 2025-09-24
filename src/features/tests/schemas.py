@@ -15,6 +15,7 @@ class TestCreate(SQLModel):
     description: str
     startAt: datetime
     endAt: datetime
+    cost: int
     status: TestStatusEnum
 
 
@@ -25,6 +26,7 @@ class TestUpdate(SQLModel):
     startAt: datetime  | None
     endAt: datetime | None
     status: TestStatusEnum | None
+    cost: int | None
     isDestroyed: bool | None
 
 class TestRead(SQLModel):
@@ -38,4 +40,5 @@ class TestRead(SQLModel):
     createdAt: datetime
     updatedAt: datetime
     examineeCount: int
+    cost: int
     actantId: int

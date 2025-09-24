@@ -4,7 +4,7 @@ from typing import Literal
 from fastapi import Query
 from sqlmodel import SQLModel
 
-from ...entities.payments import PaymentMethodEnum, PaymentStatusEnum
+from ...entities.payments import PaymentMethodEnum, PaymentStatusEnum, PaymentTargetTypeEnum
 
 
 class PaymentQueryOpts(SQLModel):
@@ -16,9 +16,9 @@ class PaymentQueryOpts(SQLModel):
 class PaymentCreate(SQLModel):
     userId: int
     amount: int
-    method: PaymentMethodEnum
+    method: PaymentMethodEnum | None = None
     status: PaymentStatusEnum
-    targetType: str
+    targetType: PaymentTargetTypeEnum
     targetId: str
     title: str
     paidAt: datetime | None = None
@@ -30,9 +30,9 @@ class PaymentRead(SQLModel):
     id: int
     userId: int
     amount: int
-    method: PaymentMethodEnum
+    method: PaymentMethodEnum | None = None
     status: PaymentStatusEnum  # noqa: F821
-    targetType: str
+    targetType: PaymentTargetTypeEnum
     targetId: str
     title: str
     paidAt: datetime | None = None
@@ -47,7 +47,7 @@ class PaymentUpdate(SQLModel):
     amount: int | None = None
     method: PaymentMethodEnum | None = None
     status: PaymentStatusEnum | None = None
-    targetType: str | None = None
+    targetType: PaymentTargetTypeEnum | None = None
     targetId: str | None = None
     title: str | None = None
     paidAt: datetime | None = None
