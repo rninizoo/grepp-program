@@ -15,6 +15,7 @@ security = HTTPBearer()
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
@@ -32,6 +33,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
     )
     return encoded_jwt
 
+
 def authenticate(access_token: str) -> dict:
 
     credentials_exception = HTTPException(
@@ -41,16 +43,17 @@ def authenticate(access_token: str) -> dict:
     )
 
     try:
-       payload = jwt.decode(
-        access_token,
-        settings.JWT_SECRET_KEY,
-        algorithms=[settings.JWT_ALGORITHM]
-    )
+        payload = jwt.decode(
+            access_token,
+            settings.JWT_SECRET_KEY,
+            algorithms=[settings.JWT_ALGORITHM]
+        )
 
     except JWTError:
         raise credentials_exception
 
     return payload
+
 
 def authenticate_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> UserRead:
     token = credentials.credentials
