@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException
 from fastapi.params import Depends
@@ -15,14 +15,17 @@ class TestService:
     def __init__(self, payment_service: PaymentService):
         self.payment_service = payment_service
 
-    def create_test(self, test_create: TestCreate, actant_id: int,session: Session) -> Test:
+    def create_test(self, test_create: TestCreate, actant_id: int, session: Session) -> Test:
         # title 중복 체크
-        existing_test = session.exec(select(Test).where(Test.title == test_create.title, Test.isDestroyed.is_(False))).first()
+        existing_test = session.exec(select(Test).where(
+            Test.title == test_create.title, Test.isDestroyed.is_(False))).first()
         if existing_test:
-            raise HTTPException(status_code=409, detail="Test already registered")
+            raise HTTPException(
+                status_code=409, detail="Test already registered")
 
         if test_create.startAt >= test_create.endAt:
-            raise HTTPException(status_code=400, detail="Cannot create this test on startAt with endAt")
+            raise HTTPException(
+                status_code=400, detail="Cannot create this test on startAt with endAt")
 
         test = Test(
             title=test_create.title,
@@ -30,7 +33,8 @@ class TestService:
             startAt=test_create.startAt,
             endAt=test_create.endAt,
             status=test_create.status,
-            actantId=actant_id
+            cost=test_create.cost,
+            actantId=actant_id,
         )
 
         session.add(test)
@@ -39,7 +43,8 @@ class TestService:
         return test
 
     def find_test_by_id(self, id: int, session: Session) -> Test | None:
-        statement = select(Test).where(Test.id == id, Test.isDestroyed.is_(False))
+        statement = select(Test).where(
+            Test.id == id, Test.isDestroyed.is_(False))
         found_test = session.exec(statement).first()
         if not found_test:
             return None
@@ -64,7 +69,7 @@ class TestService:
         tests = session.exec(stmt).all()
         return [TestRead.model_validate(test) for test in tests]
 
-    def update_test(self, test_id: int, test_update: TestUpdate, actant_id :int, session: Session) -> TestRead:
+    def update_test(self, test_id: int, test_update: TestUpdate, actant_id: int, session: Session) -> TestRead:
         stmt = select(Test).where(Test.id == test_id).with_for_update()
         test = session.exec(stmt).one_or_none()
 
@@ -73,61 +78,71 @@ class TestService:
             raise HTTPException(status_code=404, detail="Test not found")
 
         # 존재여부 시작일, 종료일 체크
-        if test_update.startAt >= test_update.endAt:
-            raise HTTPException(status_code=400, detail="Cannot update this test on startAt with endAt")
+        if test_update.startAt is not None and test_update.endAt is not None:
+            if test_update.startAt >= test_update.endAt:
+                raise HTTPException(
+                    status_code=400, detail="Cannot update this test on startAt with endAt"
+                )
 
-        # 작성자만 변경 가능
-        if test.actantId != actant_id:
-            raise HTTPException(status_code=403, detail="Not authorized to update this test")
-
+    # 작성자만 변경 가능
+        if actant_id is not None and test.actantId != actant_id:
+            raise HTTPException(
+                status_code=403, detail="Not authorized to update this test"
+            )
 
         update_data = test_update.model_dump(exclude_unset=True)
         for key, value in update_data.items():
             setattr(test, key, value)
-
-        test.updatedAt = datetime.now(timezone.utc)
+            test.updatedAt = datetime.now(timezone.utc)
         session.add(test)
         session.flush()
         session.refresh(test)
 
         return TestRead.model_validate(test)
 
-    def apply_test(self, test_id: int, actant_id :int, session: Session) -> PaymentRead:
+    def apply_test(self, test_id: int, actant_id: int, session: Session) -> PaymentRead:
 
         try:
             with session.begin():
                 test = self.find_test_by_id(test_id, session)
                 if not test or test.isDestroyed:
-                    raise HTTPException(status_code=404, detail="Test not found")
+                    raise HTTPException(
+                        status_code=404, detail="Test not found")
 
-                existing_payment = self.payment_service.find_payment_by_id(
-                user_id=actant_id,
-                target_type=PaymentTargetTypeEnum.TEST,
-                target_id=str(test_id),
-                session=session
-            )
+                # 신청기간이 아니면 에러처리
+                if not (test.startAt.replace(tzinfo=timezone.utc) <= datetime.now(timezone.utc) <= test.endAt.replace(tzinfo=timezone.utc)):
+                    raise HTTPException(
+                        status_code=400, detail="This test is not open for registration at the current time")
+
+                existing_payment = self.payment_service.find_payment_by_target_id(
+                    target_id=test.id,
+                    session=session
+                )
                 if existing_payment:
-                    raise HTTPException(status_code=409, detail="Already payment applied Test")
+                    raise HTTPException(
+                        status_code=409, detail="Already payment applied Test")
 
                 # TODO: 실제 동작하는지 테스트 필요, Biz Logic 점검 필요
                 payment_create = PaymentCreate(
                     userId=actant_id,
                     amount=test.cost,
-                    status=PaymentStatusEnum.PENDING,  # 즉시 결제 완료
+                    status=PaymentStatusEnum.PENDING,
                     targetType=PaymentTargetTypeEnum.TEST,
-                    targetId=str(test_id),
+                    targetId=test.id,
                     title=test.title,
-                    paidAt=datetime.now(timezone.utc),
                     validFrom=datetime.now(timezone.utc),
-                    validTo=datetime.now(timezone.utc),
+                    validTo=datetime.now(timezone.utc) +
+                    timedelta(weeks=1)  # 1주일 뒤
                 )
 
-                payment = self.payment_service.create_payment(payment_create=payment_create,user_id=actant_id, session = session)
+                payment = self.payment_service.create_payment(
+                    payment_create=payment_create, user_id=actant_id, session=session)
 
                 test_update = TestUpdate(examineeCount=test.examineeCount + 1)
-                self.update_test(test.id, test_update=test_update, session=session)
+                self.update_test(
+                    test_id=test.id, test_update=test_update, actant_id=actant_id, session=session)
 
-                return payment
+                return PaymentRead.model_validate(payment)
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
@@ -136,7 +151,8 @@ class TestService:
             with session.begin():
                 results: list[TestRead] = []
                 for test_id, test_update in test_updates:
-                    updated_test = self.update_test(test_id, test_update, actant_id, session)
+                    updated_test = self.update_test(
+                        test_id, test_update, actant_id, session)
                     results.append(updated_test)
             return results
         except Exception as e:
