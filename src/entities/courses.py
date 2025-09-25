@@ -10,11 +10,13 @@ class CourseStatusEnum(str, Enum):
     AVAILABLE = "AVAILABLE"
     UNAVAILABLE = "UNAVAILABLE"
 
+
 class Course(BaseModel, table=True):
     __tablename__ = "courses"
     __table_args__ = (
         CheckConstraint('"startAt" < "endAt"', name="check_start_before_end"),
-        CheckConstraint('"studentCount" >= 0', name="check_student_count_positive"),
+        CheckConstraint('"studentCount" >= 0',
+                        name="check_student_count_positive"),
     )
 
     id: int | None = Field(default=None, primary_key=True)
@@ -22,7 +24,8 @@ class Course(BaseModel, table=True):
     description: str | None = None
     startAt: datetime = Field(nullable=False)
     endAt: datetime = Field(nullable=False)
-    createdAt: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    createdAt: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc))
     updatedAt: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         sa_column_kwargs={"onupdate": lambda: datetime.now(timezone.utc)},

@@ -9,15 +9,18 @@ class PaymentStatusEnum(str, Enum):
     PAID = "PAID"
     CANCELLED = "CANCELLED"
 
+
 class PaymentMethodEnum(str, Enum):
     KAKAOPAY = "KAKAOPAY"
     TOSS = "TOSS"
     BANK = "BANK"
     CARD = "CARD"
 
+
 class PaymentTargetTypeEnum(str, Enum):
     TEST = "TEST"
     COURSE = "COURSE"
+
 
 class Payment(SQLModel, table=True):
     __tablename__ = "payments"
@@ -30,14 +33,15 @@ class Payment(SQLModel, table=True):
     status: PaymentStatusEnum = Field(nullable=False)
 
     targetType: PaymentTargetTypeEnum = Field(nullable=False)
-    targetId: str = Field(nullable=False)
+    targetId: int = Field(nullable=False)
     title: str = Field(nullable=False)
 
     paidAt: datetime | None = Field(default=None)
     validFrom: datetime = Field(nullable=False)
     validTo: datetime = Field(nullable=False)
 
-    createdAt: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    createdAt: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc))
     updatedAt: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         sa_column_kwargs={"onupdate": lambda: datetime.now(timezone.utc)},
