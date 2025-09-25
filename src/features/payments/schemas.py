@@ -13,13 +13,14 @@ class PaymentQueryOpts(SQLModel):
     date_to: datetime | None = Query(default=None, alias="to")
     sort: Literal["created", "amount"] | None = Query(default="created")
 
+
 class PaymentCreate(SQLModel):
     userId: int
     amount: int
     method: PaymentMethodEnum | None = None
     status: PaymentStatusEnum
     targetType: PaymentTargetTypeEnum
-    targetId: str
+    targetId: int
     title: str
     paidAt: datetime | None = None
     validFrom: datetime
@@ -33,7 +34,7 @@ class PaymentRead(SQLModel):
     method: PaymentMethodEnum | None = None
     status: PaymentStatusEnum  # noqa: F821
     targetType: PaymentTargetTypeEnum
-    targetId: str
+    targetId: int
     title: str
     paidAt: datetime | None = None
     validFrom: datetime
@@ -48,7 +49,7 @@ class PaymentUpdate(SQLModel):
     method: PaymentMethodEnum | None = None
     status: PaymentStatusEnum | None = None
     targetType: PaymentTargetTypeEnum | None = None
-    targetId: str | None = None
+    targetId: int | None = None
     title: str | None = None
     paidAt: datetime | None = None
     validFrom: datetime | None = None
