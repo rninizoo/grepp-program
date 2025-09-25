@@ -10,6 +10,7 @@ class CourseQueryOpts(SQLModel):
     status: str = "AVAILABLE"
     sort: Literal["created", "popular"] = "created"
 
+
 class CourseCreate(SQLModel):
     title: str
     description: str
@@ -23,11 +24,12 @@ class CourseUpdate(SQLModel):
     title: str | None
     description: str | None
     studentCount: int | None
-    startAt: datetime  | None
+    startAt: datetime | None
     endAt: datetime | None
     status: CourseStatusEnum | None
     cost: int | None
     isDestroyed: bool | None
+
 
 class CourseRead(SQLModel):
     id: int

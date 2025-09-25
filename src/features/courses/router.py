@@ -1,28 +1,54 @@
 from typing import Literal
 
 from fastapi import APIRouter, Body, Depends, Query
+from fastapi.security import HTTPAuthorizationCredentials
 from sqlmodel import Session
 
-from ...features.users.schemas import UserRead
+from ...dependencies.auth import get_auth_service
+from ...dependencies.course import get_course_service
+from ...features.auth.service import AuthService
 from ...shared.database import get_session
-from ...shared.security import authenticate_token
+from ...shared.security import security
 from . import service
 from .schemas import CourseCreate, CourseQueryOpts, CourseRead, CourseUpdate
 
 router = APIRouter(prefix="/courses", tags=["courses"])
 
-@router.get("", response_model=list[CourseRead])
-def get_courses(status: str = Query("AVAILABLE", description="Filter by Course status"), sort: Literal["created", "popular"] = Query("created", description="Sort by created or popular"),skip: int = 0, limit: int = 100, session: Session = Depends(get_session)):
 
+@router.get("", response_model=list[CourseRead])
+def get_courses(
+    service: service.CourseService = Depends(get_course_service),
+    status: str = Query("AVAILABLE", description="Filter by Course status"),
+    sort: Literal["created", "popular"] = Query(
+        "created", description="Sort by created or popular"),
+    skip: int = 0,
+    limit: int = 100,
+    session: Session = Depends(get_session),
+):
     query_opts = CourseQueryOpts(status=status, sort=sort)
-    return service.find_courses(session=session, skip=skip, limit=limit, query_opts = query_opts)
+    return service.find_courses(session=session, skip=skip, limit=limit, query_opts=query_opts)
+
 
 @router.post("", response_model=CourseRead)
-def create_course(current_user: UserRead = Depends(authenticate_token), course_create: CourseCreate = Body(...), session: Session = Depends(get_session)):
+def create_course(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    auth_service: AuthService = Depends(get_auth_service),
+    service: service.CourseService = Depends(get_course_service),
+    course_create: CourseCreate = Body(...),
+    session: Session = Depends(get_session),
+):
+    current_user = auth_service(credentials.credentials)
     return service.create_course(course_create=course_create, actant_id=current_user["id"], session=session)
 
+
 @router.patch("/{course_id}", response_model=CourseRead)
-def update_course(course_id: int, course_update: CourseUpdate = Body(...), current_user: UserRead = Depends(authenticate_token), session: Session = Depends(get_session)):
+def update_course(
+    course_id: int,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    auth_service: AuthService = Depends(get_auth_service),
+    service: service.CourseService = Depends(get_course_service),
+    course_update: CourseUpdate = Body(...),
+    session: Session = Depends(get_session),
+):
+    current_user = auth_service(credentials.credentials)
     return service.update_course(course_id=course_id, course_update=course_update, actant_id=current_user["id"], session=session)
-
-
