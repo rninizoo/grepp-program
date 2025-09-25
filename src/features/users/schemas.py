@@ -6,6 +6,7 @@ class UserCreate(SQLModel):
     email: str
     password: str
 
+
 class UserRead(SQLModel):
     id: int
     username: str
