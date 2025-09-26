@@ -21,14 +21,14 @@ class CourseCreate(SQLModel):
 
 
 class CourseUpdate(SQLModel):
-    title: str | None
-    description: str | None
-    studentCount: int | None
-    startAt: date | None
-    endAt: date | None
-    status: CourseStatusEnum | None
-    cost: int | None
-    isDestroyed: bool | None
+    title: str | None = None
+    description: str | None = None
+    studentCount: int | None = None
+    startAt: date | None = None
+    endAt: date | None = None
+    status: CourseStatusEnum | None = None
+    cost: int | None = None
+    isDestroyed: bool | None = None
 
 
 class CourseRead(SQLModel):
