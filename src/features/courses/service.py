@@ -1,7 +1,6 @@
 from datetime import datetime, timezone
 
 from fastapi import HTTPException
-from fastapi.params import Depends
 from sqlmodel import Session, asc, desc, select
 
 from ...entities.courses import Course
@@ -39,7 +38,7 @@ class CourseService:
         session.refresh(course)
         return course
 
-    def find_courses(self, session: Session, skip: int, limit: int, query_opts: CourseQueryOpts = Depends()) -> list[CourseRead]:
+    def find_courses(self, session: Session, skip: int, limit: int, query_opts: CourseQueryOpts) -> list[CourseRead]:
         stmt = select(Course).where(Course.isDestroyed.is_(False))
 
         # status 필터링

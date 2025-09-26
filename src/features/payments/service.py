@@ -1,7 +1,6 @@
-from datetime import datetime, timezone
+from datetime import datetime, time, timezone
 
 from fastapi import HTTPException
-from fastapi.params import Depends
 from sqlmodel import Session, asc, desc, select
 
 from ...entities.payments import Payment, PaymentStatusEnum
@@ -40,6 +39,7 @@ class PaymentService:
             targetType=payment_create.targetType,
             targetId=payment_create.targetId,
             title=payment_create.title,
+            paidAt=payment_create.paidAt,
             validFrom=payment_create.validFrom,
             validTo=payment_create.validTo,
         )
@@ -54,7 +54,7 @@ class PaymentService:
         session: Session,
         skip: int,
         limit: int,
-        query_opts: PaymentQueryOpts = Depends(),
+        query_opts: PaymentQueryOpts,
     ) -> list[PaymentRead]:
         stmt = select(Payment).where(Payment.isDestroyed.is_(False))
 
@@ -64,9 +64,11 @@ class PaymentService:
 
         # 기간 검색
         if query_opts.date_from:
-            stmt = stmt.where(Payment.paidAt >= query_opts.date_from)
+            dt_from = datetime.combine(query_opts.date_from, time.min)
+            stmt = stmt.where(Payment.paidAt >= dt_from)
         if query_opts.date_to:
-            stmt = stmt.where(Payment.paidAt <= query_opts.date_to)
+            dt_to = datetime.combine(query_opts.date_to, time.max)
+            stmt = stmt.where(Payment.paidAt <= dt_to)
 
         # 정렬: created | amount
         if query_opts.sort == "created":
@@ -88,9 +90,9 @@ class PaymentService:
             return None
         return found_payment
 
-    def find_payment_by_target_id(self, target_id: int, session: Session) -> Payment | None:
+    def find_payment_by_target_id_and_user_id(self, target_id: int, user_id: int, session: Session) -> Payment | None:
         statement = select(Payment).where(
-            Payment.targetId == target_id, Payment.isDestroyed.is_(False))
+            Payment.targetId == target_id, Payment.userId == user_id, Payment.isDestroyed.is_(False))
         found_payment = session.exec(statement).first()
         if not found_payment:
             return None

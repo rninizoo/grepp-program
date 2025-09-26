@@ -27,4 +27,4 @@ def paginate_my_payments(
         credentials.credentials, session=session)
     payments = payment_service.find_payments(session, skip, limit, query_opts)
     # 본인 결제만 필터링
-    return [p for p in payments if p.userId == current_user.id]
+    return [p for p in payments if p.userId == current_user['id']]

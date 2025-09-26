@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 
 from fastapi import Query
@@ -9,8 +9,8 @@ from ...entities.payments import PaymentMethodEnum, PaymentStatusEnum, PaymentTa
 
 class PaymentQueryOpts(SQLModel):
     status: PaymentStatusEnum | None = Query(default=None)
-    date_from: datetime | None = Query(default=None, alias="from")
-    date_to: datetime | None = Query(default=None, alias="to")
+    date_from: date | None = Query(default=None, alias="from")
+    date_to: date | None = Query(default=None, alias="to")
     sort: Literal["created", "amount"] | None = Query(default="created")
 
 
@@ -23,8 +23,8 @@ class PaymentCreate(SQLModel):
     targetId: int
     title: str
     paidAt: datetime | None = None
-    validFrom: datetime
-    validTo: datetime
+    validFrom: date
+    validTo: date
 
 
 class PaymentRead(SQLModel):
@@ -37,8 +37,8 @@ class PaymentRead(SQLModel):
     targetId: int
     title: str
     paidAt: datetime | None = None
-    validFrom: datetime
-    validTo: datetime
+    validFrom: date
+    validTo: date
     createdAt: datetime
     updatedAt: datetime
     isDestroyed: bool
@@ -52,6 +52,12 @@ class PaymentUpdate(SQLModel):
     targetId: int | None = None
     title: str | None = None
     paidAt: datetime | None = None
-    validFrom: datetime | None = None
-    validTo: datetime | None = None
+    cancelledAt: datetime | None = None
+    validFrom: date | None = None
+    validTo: date | None = None
     isDestroyed: bool | None = None
+
+
+class PaymentApplyTest(SQLModel):
+    amount: int
+    method: PaymentMethodEnum

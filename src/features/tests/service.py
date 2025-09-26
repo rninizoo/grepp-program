@@ -1,12 +1,11 @@
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 
 from fastapi import HTTPException
-from fastapi.params import Depends
 from sqlmodel import Session, asc, desc, select
 
 from ...entities.payments import PaymentStatusEnum, PaymentTargetTypeEnum
 from ...entities.tests import Test
-from ...features.payments.schemas import PaymentCreate, PaymentRead
+from ...features.payments.schemas import PaymentApplyTest, PaymentCreate, PaymentRead, PaymentUpdate
 from ...features.payments.service import PaymentService
 from .schemas import TestCreate, TestQueryOpts, TestRead, TestUpdate
 
@@ -50,7 +49,7 @@ class TestService:
             return None
         return found_test
 
-    def find_tests(session: Session, skip: int, limit: int, query_opts: TestQueryOpts = Depends()) -> list[TestRead]:
+    def find_tests(self, session: Session, skip: int, limit: int, query_opts: TestQueryOpts) -> list[TestRead]:
         stmt = select(Test).where(Test.isDestroyed.is_(False))
 
         # status 필터링
@@ -69,7 +68,7 @@ class TestService:
         tests = session.exec(stmt).all()
         return [TestRead.model_validate(test) for test in tests]
 
-    def update_test(self, test_id: int, test_update: TestUpdate, actant_id: int, session: Session) -> TestRead:
+    def update_test(self, test_id: int, test_update: TestUpdate, session: Session) -> TestRead:
         stmt = select(Test).where(Test.id == test_id).with_for_update()
         test = session.exec(stmt).one_or_none()
 
@@ -84,12 +83,6 @@ class TestService:
                     status_code=400, detail="Cannot update this test on startAt with endAt"
                 )
 
-    # 작성자만 변경 가능
-        if actant_id is not None and test.actantId != actant_id:
-            raise HTTPException(
-                status_code=403, detail="Not authorized to update this test"
-            )
-
         update_data = test_update.model_dump(exclude_unset=True)
         for key, value in update_data.items():
             setattr(test, key, value)
@@ -100,7 +93,7 @@ class TestService:
 
         return TestRead.model_validate(test)
 
-    def apply_test(self, test_id: int, actant_id: int, session: Session) -> PaymentRead:
+    def apply_test(self, test_id: int, payment_apply_test: PaymentApplyTest, actant_id: int, session: Session) -> PaymentRead:
 
         try:
             with session.begin():
@@ -110,7 +103,66 @@ class TestService:
                         status_code=404, detail="Test not found")
 
                 # 신청기간이 아니면 에러처리
-                if not (test.startAt.replace(tzinfo=timezone.utc) <= datetime.now(timezone.utc) <= test.endAt.replace(tzinfo=timezone.utc)):
+                if not (test.startAt <= date.today() <= test.endAt):
+                    raise HTTPException(
+                        status_code=400, detail="This test is not open for registration at the current time")
+
+                # 결제금액이 부족할 시 에러처리
+                if (test.cost > payment_apply_test.amount):
+                    raise HTTPException(
+                        status_code=400, detail="This test is cannot register by not enough amount")
+
+                existing_payment = self.payment_service.find_payment_by_target_id_and_user_id(
+                    target_id=test.id,
+                    user_id=actant_id,
+                    session=session
+                )
+
+                if existing_payment and existing_payment.status != PaymentStatusEnum.CANCELLED:
+                    raise HTTPException(
+                        status_code=409, detail="Already payment applied Test")
+
+                # 취소상태가 아닌 결제정보만 신규 결제 생성 가능
+                if existing_payment and existing_payment.status != PaymentStatusEnum.CANCELLED:
+                    raise HTTPException(
+                        status_code=409, detail="Already payment applied Test")
+
+                payment_create = PaymentCreate(
+                    userId=actant_id,
+                    amount=payment_apply_test.amount,
+                    status=PaymentStatusEnum.PAID,
+                    method=payment_apply_test.method,
+                    targetType=PaymentTargetTypeEnum.TEST,
+                    targetId=test_id,
+                    paidAt=datetime.now(timezone.utc),
+                    title=test.title,
+                    validFrom=date.today(),
+                    validTo=test.endAt
+                )
+
+                payment = self.payment_service.create_payment(
+                    payment_create=payment_create, user_id=actant_id, session=session)
+
+                # 응시인원 증가
+                test_update = TestUpdate(examineeCount=test.examineeCount + 1)
+                self.update_test(
+                    test_id=test.id, test_update=test_update, session=session)
+
+                return PaymentRead.model_validate(payment)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    def cancel_test(self, test_id: int, actant_id: int, session: Session) -> PaymentRead:
+
+        try:
+            with session.begin():
+                test = self.find_test_by_id(test_id, session)
+                if not test or test.isDestroyed:
+                    raise HTTPException(
+                        status_code=404, detail="Test not found")
+
+                # 응시완료(TestRegistration.Status = true) 상태이면 취소 불가
+                if not (test.startAt <= date.today() <= test.endAt):
                     raise HTTPException(
                         status_code=400, detail="This test is not open for registration at the current time")
 
@@ -118,29 +170,26 @@ class TestService:
                     target_id=test.id,
                     session=session
                 )
-                if existing_payment:
-                    raise HTTPException(
-                        status_code=409, detail="Already payment applied Test")
 
-                # TODO: 실제 동작하는지 테스트 필요, Biz Logic 점검 필요
-                payment_create = PaymentCreate(
-                    userId=actant_id,
-                    amount=test.cost,
-                    status=PaymentStatusEnum.PENDING,
-                    targetType=PaymentTargetTypeEnum.TEST,
-                    targetId=test.id,
-                    title=test.title,
-                    validFrom=datetime.now(timezone.utc),
-                    validTo=datetime.now(timezone.utc) +
-                    timedelta(weeks=1)  # 1주일 뒤
+                # 결제된 응시만 취소 가능
+                if existing_payment and existing_payment.status != PaymentStatusEnum.PAID:
+                    raise HTTPException(
+                        status_code=400, detail="Already payment applied Test")
+
+                payment_update = PaymentUpdate(
+                    status=PaymentStatusEnum.CANCELLED,
+                    method=None,
+                    paidAt=None,
+                    cancelledAt=datetime(timezone.utc)
                 )
 
-                payment = self.payment_service.create_payment(
-                    payment_create=payment_create, user_id=actant_id, session=session)
+                payment = self.payment_service.update_payment(
+                    payment_id=existing_payment.id, payment_update=payment_update, user_id=actant_id, session=session)
 
-                test_update = TestUpdate(examineeCount=test.examineeCount + 1)
+                # 응시인원 감소
+                test_update = TestUpdate(examineeCount=test.examineeCount - 1)
                 self.update_test(
-                    test_id=test.id, test_update=test_update, actant_id=actant_id, session=session)
+                    test_id=test.id, test_update=test_update, session=session)
 
                 return PaymentRead.model_validate(payment)
         except Exception as e:
@@ -152,7 +201,7 @@ class TestService:
                 results: list[TestRead] = []
                 for test_id, test_update in test_updates:
                     updated_test = self.update_test(
-                        test_id, test_update, actant_id, session)
+                        test_id, test_update, session)
                     results.append(updated_test)
             return results
         except Exception as e:

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 
 from sqlmodel import SQLModel
@@ -14,8 +14,8 @@ class TestQueryOpts(SQLModel):
 class TestCreate(SQLModel):
     title: str
     description: str
-    startAt: datetime
-    endAt: datetime
+    startAt: date
+    endAt: date
     cost: int
     status: TestStatusEnum
 
@@ -24,19 +24,19 @@ class TestUpdate(SQLModel):
     title: str | None = None
     description: str | None = None
     examineeCount: int | None = None
-    startAt: datetime | None = None
-    endAt: datetime | None = None
+    startAt: date | None = None
+    endAt: date | None = None
     status: TestStatusEnum | None = None
     cost: int | None = None
-    isDestroyed: bool | None = None
+    isDestroyed: bool | None = False
 
 
 class TestRead(SQLModel):
     id: int
     title: str
     description: str
-    startAt: datetime
-    endAt: datetime
+    startAt: date
+    endAt: date
     status: TestStatusEnum
     isDestroyed: bool
     createdAt: datetime

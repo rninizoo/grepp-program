@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 
 from sqlmodel import SQLModel
@@ -14,8 +14,8 @@ class CourseQueryOpts(SQLModel):
 class CourseCreate(SQLModel):
     title: str
     description: str
-    startAt: datetime
-    endAt: datetime
+    startAt: date
+    endAt: date
     status: CourseStatusEnum
     cost: int
 
@@ -24,8 +24,8 @@ class CourseUpdate(SQLModel):
     title: str | None
     description: str | None
     studentCount: int | None
-    startAt: datetime | None
-    endAt: datetime | None
+    startAt: date | None
+    endAt: date | None
     status: CourseStatusEnum | None
     cost: int | None
     isDestroyed: bool | None
