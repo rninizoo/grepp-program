@@ -5,7 +5,7 @@ from sqlmodel import Session, asc, desc, select
 
 from ...entities.courses import Course
 from ...entities.payments import PaymentStatusEnum, PaymentTargetTypeEnum
-from ...features.payments.schemas import PaymentApplyCourse, PaymentCreate, PaymentRead, PaymentUpdate
+from ...features.payments.schemas import PaymentApplyCourse, PaymentCreate, PaymentRead
 from ...features.payments.service import PaymentService
 from .schemas import CourseCreate, CourseQueryOpts, CourseRead, CourseUpdate
 
@@ -14,7 +14,7 @@ class CourseService:
     def __init__(self, payment_service: PaymentService):
         self.payment_service = payment_service
 
-    def create_course(self, course_create:   CourseCreate, actant_id: int, session: Session) -> Course:
+    def create_course(self, course_create:   CourseCreate, actant_id: str, session: Session) -> Course:
         # title 중복 체크
         existing_course = session.exec(select(Course).where(
             Course.title == course_create.title, Course.isDestroyed.is_(False))).first()
@@ -60,7 +60,7 @@ class CourseService:
         courses = session.exec(stmt).all()
         return [CourseRead.model_validate(course) for course in courses]
 
-    def find_course_by_id(self, id: int, session: Session, for_update: bool = False) -> Course | None:
+    def find_course_by_id(self, id: str, session: Session, for_update: bool = False) -> Course | None:
         stmt = select(Course).where(Course.id == id,
                                     Course.isDestroyed.is_(False))
 
@@ -70,7 +70,7 @@ class CourseService:
         course = session.exec(stmt).first()
         return course
 
-    def update_course(self, course_id: int, course_update: CourseUpdate, session: Session) -> CourseRead:
+    def update_course(self, course_id: str, course_update: CourseUpdate, session: Session) -> CourseRead:
 
         stmt = select(Course).where(Course.id == course_id).with_for_update()
         course = session.exec(stmt).one_or_none()
@@ -97,7 +97,7 @@ class CourseService:
 
         return CourseRead.model_validate(course)
 
-    def apply_course(self, course_id: int, payment_apply_course: PaymentApplyCourse, actant_id: int, session: Session) -> PaymentRead:
+    def apply_course(self, course_id: str, payment_apply_course: PaymentApplyCourse, actant_id: str, session: Session) -> PaymentRead:
 
         try:
             course = self.find_course_by_id(
@@ -146,7 +146,7 @@ class CourseService:
                 validTo=course.endAt
             )
 
-            payment = self.payment_service.create_payment(
+            payment = self.payment_service.apply_payment(
                 payment_create=payment_create, user_id=actant_id, session=session)
 
             # 수강인원 증가
@@ -159,7 +159,7 @@ class CourseService:
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
-    def cancel_course(self, course_id: int, actant_id: int, session: Session) -> PaymentRead:
+    def cancel_course(self, course_id: str, actant_id: str, session: Session) -> PaymentRead:
 
         try:
             course = self.find_course_by_id(course_id, session, True)
@@ -182,15 +182,8 @@ class CourseService:
                 raise HTTPException(
                     status_code=400, detail="Already payment applied Course")
 
-            payment_update = PaymentUpdate(
-                status=PaymentStatusEnum.CANCELLED,
-                method=None,
-                paidAt=None,
-                cancelledAt=datetime(timezone.utc)
-            )
-
-            payment = self.payment_service.update_payment(
-                payment_id=existing_payment.id, payment_update=payment_update, user_id=actant_id, session=session)
+            payment = self.payment_service.cancel_payment(
+                payment_id=existing_payment.id, user_id=actant_id, session=session)
 
             # 수강인원 감소
             course_update = CourseUpdate(
@@ -202,7 +195,7 @@ class CourseService:
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
-    def bulk_update_course(self, course_updates: list[tuple[int, CourseUpdate]], actant_id: int, session: Session):
+    def bulk_update_course(self, course_updates: list[tuple[int, CourseUpdate]], session: Session):
         try:
             results: list[CourseRead] = []
             for course_id, course_update in course_updates:

@@ -4,14 +4,32 @@ from fastapi import HTTPException
 from sqlmodel import Session, select
 
 from ...entities.payments import Payment, PaymentStatusEnum, PaymentTargetTypeEnum
+from ...features.course_registration.schemas import CourseRegistrationStatusEnum, CourseRegistrationUpdate
+from ...features.course_registration.service import CourseRegistrationService
+from ...features.test_registration.schemas import TestRegistrationStatusEnum, TestRegistrationUpdate
+from ...features.test_registration.service import TestRegistrationService
 from .schemas import PaymentCreate, PaymentQueryOpts, PaymentRead, PaymentUpdate
 
 
 class PaymentService:
-    def __init__(self):
-        pass
+    REGISTRATION_MAP = {
+        PaymentTargetTypeEnum.TEST: {
+            "service_attr": "test_registration_service",
+            "update_schema": TestRegistrationUpdate,
+            "status_enum": TestRegistrationStatusEnum,
+        },
+        PaymentTargetTypeEnum.COURSE: {
+            "service_attr": "course_registration_service",
+            "update_schema": CourseRegistrationUpdate,
+            "status_enum": CourseRegistrationStatusEnum,
+        },
+    }
 
-    def create_payment(self, payment_create: PaymentCreate, user_id: int, session: Session) -> Payment:
+    def __init__(self, test_registration_service: TestRegistrationService, course_registration_service: CourseRegistrationService):
+        self.test_registration_service = test_registration_service
+        self.course_registration_service = course_registration_service
+
+    def create_payment(self, payment_create: PaymentCreate, user_id: str, session: Session) -> Payment:
         # validFrom, validTo 검사
         if payment_create.validFrom >= payment_create.validTo:
             raise HTTPException(
@@ -47,6 +65,104 @@ class PaymentService:
         session.add(payment)
         session.flush()
         session.refresh(payment)
+
+        return payment
+
+    def apply_payment(self, payment_create: PaymentCreate, user_id: str, session: Session) -> Payment:
+        # validFrom, validTo 검사
+        if payment_create.validFrom >= payment_create.validTo:
+            raise HTTPException(
+                status_code=400, detail="Invalid validFrom/validTo range")
+
+        existing_payment = session.exec(
+            select(Payment).where(
+                Payment.userId == user_id,
+                Payment.targetType == payment_create.targetType,
+                Payment.targetId == payment_create.targetId,
+                Payment.status != PaymentStatusEnum.CANCELLED,
+                Payment.isDestroyed.is_(False)
+            )
+        ).first()
+
+        if existing_payment:
+            raise HTTPException(
+                status_code=409, detail="Payment request already exists")
+
+        payment = Payment(
+            userId=user_id,
+            amount=payment_create.amount,
+            method=payment_create.method,
+            status=payment_create.status,
+            targetType=payment_create.targetType,
+            targetId=payment_create.targetId,
+            title=payment_create.title,
+            paidAt=payment_create.paidAt,
+            validFrom=payment_create.validFrom,
+            validTo=payment_create.validTo,
+        )
+
+        session.add(payment)
+        session.flush()
+        session.refresh(payment)
+
+        if payment_create.targetType == PaymentTargetTypeEnum.TEST:
+            self.test_registration_service.create_registration(
+                user_id=payment_create.userId, test_id=payment_create.targetId, payment_id=payment.id, session=session)
+        elif payment_create.targetType == PaymentTargetTypeEnum.COURSE:
+            self.course_registration_service.create_registration(
+                user_id=payment_create.userId, course_id=payment_create.targetId, payment_id=payment.id, session=session)
+        else:
+            raise HTTPException(status_code=400, detail="Invalid target type")
+
+        return payment
+
+    def cancel_payment(self, payment_id: str, user_id: str, session: Session) -> Payment:
+
+        payment = session.exec(
+            select(Payment)
+            .where(Payment.id == payment_id, Payment.userId == user_id, Payment.isDestroyed.is_(False))
+            .with_for_update()
+        ).first()
+
+        if not payment:
+            raise HTTPException(
+                status_code=404, detail="Payment not found")
+        if payment.status != PaymentStatusEnum.PAID:
+            if payment.status == PaymentStatusEnum.CANCELLED:
+                raise HTTPException(
+                    status_code=400, detail="Payment Cancelled Already.")
+            if payment.status == PaymentStatusEnum.PENDING:
+                raise HTTPException(
+                    status_code=400, detail="Payment Not Paid")
+
+        payment.status = PaymentStatusEnum.CANCELLED
+        payment.cancelledAt = datetime.now(timezone.utc)
+        payment.updatedAt = datetime.now(timezone.utc)
+
+        session.add(payment)
+
+        config = self.REGISTRATION_MAP[payment.targetType]
+        registration_service = getattr(self, config["service_attr"])
+        update_schema = config["update_schema"]
+        status_enum = config["status_enum"]
+
+        registration = registration_service.find_registration_by_target_id_and_payment_id(
+            target_id=payment.targetId, payment_id=payment.id, session=session, for_update=True
+        )
+
+        if registration.status == status_enum.COMPLETED:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot cancel a completed {payment.targetType.lower()} registration"
+            )
+
+        registration_update = update_schema(
+            isDestroyed=True, updatedAt=datetime.now(timezone.utc))
+        registration_service.update_registration(registration_id=registration.id,
+                                                 registration_update=registration_update, session=session)
+
+        session.flush()
+        session.refresh(payment)
         return payment
 
     def find_payments(
@@ -76,7 +192,7 @@ class PaymentService:
         payments = session.exec(stmt).all()
         return [PaymentRead.model_validate(payment) for payment in payments]
 
-    def find_payment_by_id(self, id: int, session: Session) -> Payment | None:
+    def find_payment_by_id(self, id: str, session: Session) -> Payment | None:
         statement = select(Payment).where(
             Payment.id == id, Payment.isDestroyed.is_(False))
         found_payment = session.exec(statement).first()
@@ -84,7 +200,7 @@ class PaymentService:
             return None
         return found_payment
 
-    def find_payment_by_target_id_and_user_id(self, target_id: int, target_type: PaymentTargetTypeEnum, user_id: int, session: Session, for_update: bool = False) -> Payment | None:
+    def find_payment_by_target_id_and_user_id(self, target_id: str, target_type: PaymentTargetTypeEnum, user_id: str, session: Session, for_update: bool = False) -> Payment | None:
 
         stmt = select(Payment).where(
             Payment.targetId == target_id,
@@ -102,7 +218,7 @@ class PaymentService:
             return None
         return found_payment
 
-    def update_payment(self, payment_id: int, payment_update: PaymentUpdate, user_id: int, session: Session) -> PaymentRead:
+    def update_payment(self, payment_id: str, payment_update: PaymentUpdate, user_id: str, session: Session) -> PaymentRead:
         stmt = select(Payment).where(
             Payment.id == payment_id).with_for_update()
         payment = session.exec(stmt).one_or_none()
@@ -132,7 +248,7 @@ class PaymentService:
 
         return PaymentRead.model_validate(payment)
 
-    def bulk_update_payment(self, payment_updates: list[tuple[int, PaymentUpdate]], user_id: int, session: Session):
+    def bulk_update_payment(self, payment_updates: list[tuple[str, PaymentUpdate]], user_id: str, session: Session):
         try:
             results: list[PaymentRead] = []
             for payment_id, payment_update in payment_updates:
