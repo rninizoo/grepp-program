@@ -1,5 +1,4 @@
 from datetime import date, datetime
-from typing import Literal
 
 from fastapi import Query
 from sqlmodel import SQLModel
@@ -11,7 +10,6 @@ class PaymentQueryOpts(SQLModel):
     status: PaymentStatusEnum | None = Query(default=None)
     date_from: date | None = Query(default=None, alias="from")
     date_to: date | None = Query(default=None, alias="to")
-    sort: Literal["created", "amount"] | None = Query(default="created")
 
 
 class PaymentCreate(SQLModel):

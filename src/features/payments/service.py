@@ -1,7 +1,7 @@
 from datetime import datetime, time, timezone
 
 from fastapi import HTTPException
-from sqlmodel import Session, asc, desc, select
+from sqlmodel import Session, select
 
 from ...entities.payments import Payment, PaymentStatusEnum
 from .schemas import PaymentCreate, PaymentQueryOpts, PaymentRead, PaymentUpdate
@@ -69,12 +69,6 @@ class PaymentService:
         if query_opts.date_to:
             dt_to = datetime.combine(query_opts.date_to, time.max)
             stmt = stmt.where(Payment.paidAt <= dt_to)
-
-        # 정렬: created | amount
-        if query_opts.sort == "created":
-            stmt = stmt.order_by(asc(Payment.createdAt))
-        elif query_opts.sort == "amount":
-            stmt = stmt.order_by(desc(Payment.amount))
 
         # offset, limit
         stmt = stmt.offset(skip).limit(limit)

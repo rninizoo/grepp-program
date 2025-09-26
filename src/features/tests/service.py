@@ -199,10 +199,10 @@ class TestService:
         try:
             with session.begin():
                 results: list[TestRead] = []
-                for test_id, test_update in test_updates:
-                    updated_test = self.update_test(
-                        test_id, test_update, session)
-                    results.append(updated_test)
+            for test_id, test_update in test_updates:
+                updated_test = self.update_test(
+                    test_id, test_update, session)
+                results.append(updated_test)
             return results
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
