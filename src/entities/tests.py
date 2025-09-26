@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from enum import Enum
 
 from sqlmodel import CheckConstraint, Field
@@ -22,8 +22,8 @@ class Test(BaseModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     title: str
     description: str | None = None
-    startAt: datetime = Field(nullable=False)
-    endAt: datetime = Field(nullable=False)
+    startAt: date = Field(nullable=False)
+    endAt: date = Field(nullable=False)
     createdAt: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc))
     updatedAt: datetime = Field(

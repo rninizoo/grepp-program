@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from enum import Enum
 
 from sqlmodel import Field, SQLModel
@@ -37,12 +37,16 @@ class Payment(SQLModel, table=True):
     title: str = Field(nullable=False)
 
     paidAt: datetime | None = Field(default=None)
-    validFrom: datetime = Field(nullable=False)
-    validTo: datetime = Field(nullable=False)
+    validFrom: date = Field(nullable=False)
+    validTo: date = Field(nullable=False)
 
     createdAt: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc))
     updatedAt: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column_kwargs={"onupdate": lambda: datetime.now(timezone.utc)},
+    )
+    cancelledAt: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         sa_column_kwargs={"onupdate": lambda: datetime.now(timezone.utc)},
     )
