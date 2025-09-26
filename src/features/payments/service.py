@@ -3,7 +3,7 @@ from datetime import datetime, time, timezone
 from fastapi import HTTPException
 from sqlmodel import Session, select
 
-from ...entities.payments import Payment, PaymentStatusEnum
+from ...entities.payments import Payment, PaymentStatusEnum, PaymentTargetTypeEnum
 from .schemas import PaymentCreate, PaymentQueryOpts, PaymentRead, PaymentUpdate
 
 
@@ -84,9 +84,9 @@ class PaymentService:
             return None
         return found_payment
 
-    def find_payment_by_target_id_and_user_id(self, target_id: int, user_id: int, session: Session) -> Payment | None:
+    def find_payment_by_target_id_and_user_id(self, target_id: int, target_type: PaymentTargetTypeEnum, user_id: int, session: Session) -> Payment | None:
         statement = select(Payment).where(
-            Payment.targetId == target_id, Payment.userId == user_id, Payment.isDestroyed.is_(False))
+            Payment.targetId == target_id, Payment.targetType == target_type, Payment.userId == user_id, Payment.isDestroyed.is_(False))
         found_payment = session.exec(statement).first()
         if not found_payment:
             return None
@@ -124,12 +124,11 @@ class PaymentService:
 
     def bulk_update_payment(self, payment_updates: list[tuple[int, PaymentUpdate]], user_id: int, session: Session):
         try:
-            with session.begin():
-                results: list[PaymentRead] = []
-                for payment_id, payment_update in payment_updates:
-                    updated_payment = self.update_payment(
-                        payment_id, payment_update, user_id, session)
-                    results.append(updated_payment)
+            results: list[PaymentRead] = []
+            for payment_id, payment_update in payment_updates:
+                updated_payment = self.update_payment(
+                    payment_id, payment_update, user_id, session)
+                results.append(updated_payment)
             return results
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))

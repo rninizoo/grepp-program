@@ -59,3 +59,8 @@ class PaymentUpdate(SQLModel):
 class PaymentApplyTest(SQLModel):
     amount: int
     method: PaymentMethodEnum
+
+
+class PaymentApplyCourse(SQLModel):
+    amount: int
+    method: PaymentMethodEnum

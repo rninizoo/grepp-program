@@ -96,109 +96,107 @@ class TestService:
     def apply_test(self, test_id: int, payment_apply_test: PaymentApplyTest, actant_id: int, session: Session) -> PaymentRead:
 
         try:
-            with session.begin():
-                test = self.find_test_by_id(test_id, session)
-                if not test or test.isDestroyed:
-                    raise HTTPException(
-                        status_code=404, detail="Test not found")
+            test = self.find_test_by_id(test_id, session)
+            if not test or test.isDestroyed:
+                raise HTTPException(
+                    status_code=404, detail="Test not found")
 
-                # 신청기간이 아니면 에러처리
-                if not (test.startAt <= date.today() <= test.endAt):
-                    raise HTTPException(
-                        status_code=400, detail="This test is not open for registration at the current time")
+            # 신청기간이 아니면 에러처리
+            if not (test.startAt <= date.today() <= test.endAt):
+                raise HTTPException(
+                    status_code=400, detail="This test is not open for registration at the current time")
 
-                # 결제금액이 부족할 시 에러처리
-                if (test.cost > payment_apply_test.amount):
-                    raise HTTPException(
-                        status_code=400, detail="This test is cannot register by not enough amount")
+            # 결제금액이 부족할 시 에러처리
+            if (test.cost > payment_apply_test.amount):
+                raise HTTPException(
+                    status_code=400, detail="This test is cannot register by not enough amount")
 
-                existing_payment = self.payment_service.find_payment_by_target_id_and_user_id(
-                    target_id=test.id,
-                    user_id=actant_id,
-                    session=session
-                )
+            existing_payment = self.payment_service.find_payment_by_target_id_and_user_id(
+                target_id=test.id,
+                target_type=PaymentTargetTypeEnum.TEST,
+                user_id=actant_id,
+                session=session
+            )
 
-                if existing_payment and existing_payment.status != PaymentStatusEnum.CANCELLED:
-                    raise HTTPException(
-                        status_code=409, detail="Already payment applied Test")
+            if existing_payment and existing_payment.status != PaymentStatusEnum.CANCELLED:
+                raise HTTPException(
+                    status_code=409, detail="Already payment applied Test")
 
-                # 취소상태가 아닌 결제정보만 신규 결제 생성 가능
-                if existing_payment and existing_payment.status != PaymentStatusEnum.CANCELLED:
-                    raise HTTPException(
-                        status_code=409, detail="Already payment applied Test")
+            # 취소상태가 아닌 결제정보만 신규 결제 생성 가능
+            if existing_payment and existing_payment.status != PaymentStatusEnum.CANCELLED:
+                raise HTTPException(
+                    status_code=409, detail="Already payment applied Test")
 
-                payment_create = PaymentCreate(
-                    userId=actant_id,
-                    amount=payment_apply_test.amount,
-                    status=PaymentStatusEnum.PAID,
-                    method=payment_apply_test.method,
-                    targetType=PaymentTargetTypeEnum.TEST,
-                    targetId=test_id,
-                    paidAt=datetime.now(timezone.utc),
-                    title=test.title,
-                    validFrom=date.today(),
-                    validTo=test.endAt
-                )
+            payment_create = PaymentCreate(
+                userId=actant_id,
+                amount=payment_apply_test.amount,
+                status=PaymentStatusEnum.PAID,
+                method=payment_apply_test.method,
+                targetType=PaymentTargetTypeEnum.TEST,
+                targetId=test_id,
+                paidAt=datetime.now(timezone.utc),
+                title=test.title,
+                validFrom=date.today(),
+                validTo=test.endAt
+            )
 
-                payment = self.payment_service.create_payment(
-                    payment_create=payment_create, user_id=actant_id, session=session)
+            payment = self.payment_service.create_payment(
+                payment_create=payment_create, user_id=actant_id, session=session)
 
-                # 응시인원 증가
-                test_update = TestUpdate(examineeCount=test.examineeCount + 1)
-                self.update_test(
-                    test_id=test.id, test_update=test_update, session=session)
+            # 응시인원 증가
+            test_update = TestUpdate(examineeCount=test.examineeCount + 1)
+            self.update_test(
+                test_id=test.id, test_update=test_update, session=session)
 
-                return PaymentRead.model_validate(payment)
+            return PaymentRead.model_validate(payment)
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
     def cancel_test(self, test_id: int, actant_id: int, session: Session) -> PaymentRead:
 
         try:
-            with session.begin():
-                test = self.find_test_by_id(test_id, session)
-                if not test or test.isDestroyed:
-                    raise HTTPException(
-                        status_code=404, detail="Test not found")
+            test = self.find_test_by_id(test_id, session)
+            if not test or test.isDestroyed:
+                raise HTTPException(
+                    status_code=404, detail="Test not found")
 
-                # 응시완료(TestRegistration.Status = true) 상태이면 취소 불가
-                if not (test.startAt <= date.today() <= test.endAt):
-                    raise HTTPException(
-                        status_code=400, detail="This test is not open for registration at the current time")
+            # 응시완료(TestRegistration.Status = true) 상태이면 취소 불가
+            if not (test.startAt <= date.today() <= test.endAt):
+                raise HTTPException(
+                    status_code=400, detail="This test is not open for registration at the current time")
 
-                existing_payment = self.payment_service.find_payment_by_target_id(
-                    target_id=test.id,
-                    session=session
-                )
+            existing_payment = self.payment_service.find_payment_by_target_id(
+                target_id=test.id,
+                session=session
+            )
 
-                # 결제된 응시만 취소 가능
-                if existing_payment and existing_payment.status != PaymentStatusEnum.PAID:
-                    raise HTTPException(
-                        status_code=400, detail="Already payment applied Test")
+            # 결제된 응시만 취소 가능
+            if existing_payment and existing_payment.status != PaymentStatusEnum.PAID:
+                raise HTTPException(
+                    status_code=400, detail="Already payment applied Test")
 
-                payment_update = PaymentUpdate(
-                    status=PaymentStatusEnum.CANCELLED,
-                    method=None,
-                    paidAt=None,
-                    cancelledAt=datetime(timezone.utc)
-                )
+            payment_update = PaymentUpdate(
+                status=PaymentStatusEnum.CANCELLED,
+                method=None,
+                paidAt=None,
+                cancelledAt=datetime(timezone.utc)
+            )
 
-                payment = self.payment_service.update_payment(
-                    payment_id=existing_payment.id, payment_update=payment_update, user_id=actant_id, session=session)
+            payment = self.payment_service.update_payment(
+                payment_id=existing_payment.id, payment_update=payment_update, user_id=actant_id, session=session)
 
-                # 응시인원 감소
-                test_update = TestUpdate(examineeCount=test.examineeCount - 1)
-                self.update_test(
-                    test_id=test.id, test_update=test_update, session=session)
+            # 응시인원 감소
+            test_update = TestUpdate(examineeCount=test.examineeCount - 1)
+            self.update_test(
+                test_id=test.id, test_update=test_update, session=session)
 
-                return PaymentRead.model_validate(payment)
+            return PaymentRead.model_validate(payment)
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
     def bulk_update_test(self, test_updates: list[tuple[int, TestUpdate]], actant_id: int, session: Session):
         try:
-            with session.begin():
-                results: list[TestRead] = []
+            results: list[TestRead] = []
             for test_id, test_update in test_updates:
                 updated_test = self.update_test(
                     test_id, test_update, session)
