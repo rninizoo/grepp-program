@@ -1,7 +1,7 @@
 from datetime import date, datetime, timezone
 from enum import Enum
 
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field, Index, SQLModel
 
 
 class PaymentStatusEnum(str, Enum):
@@ -24,6 +24,12 @@ class PaymentTargetTypeEnum(str, Enum):
 
 class Payment(SQLModel, table=True):
     __tablename__ = "payments"
+    __table_args__ = (
+        Index(
+            "idx_payment_target_user_type_isdestroyed",
+            "targetId", "targetType", "userId", "isDestroyed"
+        ),
+    )
 
     id: int = Field(default=None, primary_key=True)
     userId: int = Field(foreign_key="user.id", nullable=False)

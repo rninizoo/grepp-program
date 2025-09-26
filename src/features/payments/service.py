@@ -84,10 +84,20 @@ class PaymentService:
             return None
         return found_payment
 
-    def find_payment_by_target_id_and_user_id(self, target_id: int, target_type: PaymentTargetTypeEnum, user_id: int, session: Session) -> Payment | None:
-        statement = select(Payment).where(
-            Payment.targetId == target_id, Payment.targetType == target_type, Payment.userId == user_id, Payment.isDestroyed.is_(False))
-        found_payment = session.exec(statement).first()
+    def find_payment_by_target_id_and_user_id(self, target_id: int, target_type: PaymentTargetTypeEnum, user_id: int, session: Session, for_update: bool = False) -> Payment | None:
+
+        stmt = select(Payment).where(
+            Payment.targetId == target_id,
+            Payment.targetType == target_type,
+            Payment.userId == user_id,
+            Payment.isDestroyed.is_(False)
+        )
+
+        if for_update:
+            stmt = stmt.with_for_update()
+
+        found_payment = session.exec(stmt).first()
+
         if not found_payment:
             return None
         return found_payment

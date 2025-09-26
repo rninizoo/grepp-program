@@ -60,13 +60,15 @@ class CourseService:
         courses = session.exec(stmt).all()
         return [CourseRead.model_validate(course) for course in courses]
 
-    def find_course_by_id(self, id: int, session: Session) -> Course | None:
-        statement = select(Course).where(
-            Course.id == id, Course.isDestroyed.is_(False))
-        found_course = session.exec(statement).first()
-        if not found_course:
-            return None
-        return found_course
+    def find_course_by_id(self, id: int, session: Session, for_update: bool = False) -> Course | None:
+        stmt = select(Course).where(Course.id == id,
+                                    Course.isDestroyed.is_(False))
+
+        if for_update:
+            stmt = stmt.with_for_update()  # 여기서 FOR UPDATE 적용
+
+        course = session.exec(stmt).first()
+        return course
 
     def update_course(self, course_id: int, course_update: CourseUpdate, session: Session) -> CourseRead:
 
@@ -98,7 +100,8 @@ class CourseService:
     def apply_course(self, course_id: int, payment_apply_course: PaymentApplyCourse, actant_id: int, session: Session) -> PaymentRead:
 
         try:
-            course = self.find_course_by_id(course_id, session)
+            course = self.find_course_by_id(
+                course_id, session, for_update=True)
             if not course or course.isDestroyed:
                 raise HTTPException(
                     status_code=404, detail="Course not found")
@@ -117,7 +120,8 @@ class CourseService:
                 target_id=course.id,
                 target_type=PaymentTargetTypeEnum.COURSE,
                 user_id=actant_id,
-                session=session
+                session=session,
+                for_update=True
             )
 
             if existing_payment and existing_payment.status != PaymentStatusEnum.CANCELLED:
@@ -158,7 +162,7 @@ class CourseService:
     def cancel_course(self, course_id: int, actant_id: int, session: Session) -> PaymentRead:
 
         try:
-            course = self.find_course_by_id(course_id, session)
+            course = self.find_course_by_id(course_id, session, True)
             if not course or course.isDestroyed:
                 raise HTTPException(
                     status_code=404, detail="Course not found")

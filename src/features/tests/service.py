@@ -41,13 +41,14 @@ class TestService:
         session.refresh(test)
         return test
 
-    def find_test_by_id(self, id: int, session: Session) -> Test | None:
-        statement = select(Test).where(
-            Test.id == id, Test.isDestroyed.is_(False))
-        found_test = session.exec(statement).first()
-        if not found_test:
-            return None
-        return found_test
+    def find_test_by_id(self, id: int, session: Session, for_update: bool = False) -> Test | None:
+        stmt = select(Test).where(Test.id == id, Test.isDestroyed.is_(False))
+
+        if for_update:
+            stmt = stmt.with_for_update()  # 여기서 FOR UPDATE 적용
+
+        test = session.exec(stmt).first()
+        return test
 
     def find_tests(self, session: Session, skip: int, limit: int, query_opts: TestQueryOpts) -> list[TestRead]:
         stmt = select(Test).where(Test.isDestroyed.is_(False))
@@ -96,7 +97,7 @@ class TestService:
     def apply_test(self, test_id: int, payment_apply_test: PaymentApplyTest, actant_id: int, session: Session) -> PaymentRead:
 
         try:
-            test = self.find_test_by_id(test_id, session)
+            test = self.find_test_by_id(test_id, session, True)
             if not test or test.isDestroyed:
                 raise HTTPException(
                     status_code=404, detail="Test not found")
@@ -115,7 +116,8 @@ class TestService:
                 target_id=test.id,
                 target_type=PaymentTargetTypeEnum.TEST,
                 user_id=actant_id,
-                session=session
+                session=session,
+                for_update=True
             )
 
             if existing_payment and existing_payment.status != PaymentStatusEnum.CANCELLED:
@@ -155,7 +157,7 @@ class TestService:
     def cancel_test(self, test_id: int, actant_id: int, session: Session) -> PaymentRead:
 
         try:
-            test = self.find_test_by_id(test_id, session)
+            test = self.find_test_by_id(test_id, session, True)
             if not test or test.isDestroyed:
                 raise HTTPException(
                     status_code=404, detail="Test not found")
