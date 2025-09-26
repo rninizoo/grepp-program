@@ -35,6 +35,7 @@ class AuthService:
 
     def get_my_by_token(self, access_token: str, session: Session) -> UserRead:
         token = authenticate(access_token=access_token)
+
         found_user = self.user_service.find_user_by_id(
             token["id"], session=session)
 
