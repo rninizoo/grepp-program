@@ -32,7 +32,7 @@ class TestUpdate(SQLModel):
 
 
 class TestRead(SQLModel):
-    id: int
+    id: str
     title: str
     description: str
     startAt: date
@@ -43,4 +43,4 @@ class TestRead(SQLModel):
     updatedAt: datetime
     examineeCount: int
     cost: int
-    actantId: int
+    actantId: str

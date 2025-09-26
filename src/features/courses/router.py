@@ -45,7 +45,7 @@ def create_course(
 
 @router.patch("/{course_id}", response_model=CourseRead)
 def update_course(
-    course_id: int,
+    course_id: str,
     credentials: HTTPAuthorizationCredentials = Depends(security),
     auth_service: AuthService = Depends(get_auth_service),
     service: service.CourseService = Depends(get_course_service),
@@ -58,7 +58,7 @@ def update_course(
 
 @router.post("/{course_id}/apply", response_model=PaymentRead)
 def apply_course(
-    course_id: int,
+    course_id: str,
     payment_apply_course: PaymentApplyCourse = Body(...),
     credentials: HTTPAuthorizationCredentials = Depends(security),
     auth_service: AuthService = Depends(get_auth_service),

@@ -45,7 +45,7 @@ def create_test(
 
 @router.patch("/{test_id}", response_model=TestRead)
 def update_test(
-    test_id: int,
+    test_id: str,
     test_update: TestUpdate = Body(...),
     credentials: HTTPAuthorizationCredentials = Depends(security),
     auth_service: AuthService = Depends(get_auth_service),
@@ -61,7 +61,7 @@ def update_test(
 
 @router.post("/{test_id}/apply", response_model=PaymentRead)
 def apply_test(
-    test_id: int,
+    test_id: str,
     payment_apply_test: PaymentApplyTest = Body(...),
     credentials: HTTPAuthorizationCredentials = Depends(security),
     auth_service: AuthService = Depends(get_auth_service),
