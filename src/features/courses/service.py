@@ -3,8 +3,10 @@ from datetime import date, datetime, timezone
 from fastapi import HTTPException
 from sqlmodel import Session, asc, desc, select
 
+from ...entities.course_registration import CourseRegistrationStatusEnum
 from ...entities.courses import Course
 from ...entities.payments import PaymentStatusEnum, PaymentTargetTypeEnum
+from ...features.course_registration.schemas import CourseRegistrationUpdate
 from ...features.payments.schemas import PaymentApplyCourse, PaymentCreate, PaymentRead
 from ...features.payments.service import PaymentService
 from .schemas import CourseCreate, CourseQueryOpts, CourseRead, CourseUpdate
@@ -60,8 +62,8 @@ class CourseService:
         courses = session.exec(stmt).all()
         return [CourseRead.model_validate(course) for course in courses]
 
-    def find_course_by_id(self, id: str, session: Session, for_update: bool = False) -> Course | None:
-        stmt = select(Course).where(Course.id == id,
+    def find_course_by_id(self, course_id: str, session: Session, for_update: bool = False) -> Course | None:
+        stmt = select(Course).where(Course.id == course_id,
                                     Course.isDestroyed.is_(False))
 
         if for_update:
@@ -101,7 +103,7 @@ class CourseService:
 
         try:
             course = self.find_course_by_id(
-                course_id, session, for_update=True)
+                course_id=course_id, session=session, for_update=True)
             if not course or course.isDestroyed:
                 raise HTTPException(
                     status_code=404, detail="Course not found")
@@ -157,12 +159,16 @@ class CourseService:
 
             return PaymentRead.model_validate(payment)
         except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(
+                status_code=getattr(e, "status_code", 500),
+                detail=str(e)
+            )
 
     def cancel_course(self, course_id: str, actant_id: str, session: Session) -> PaymentRead:
 
         try:
-            course = self.find_course_by_id(course_id, session, True)
+            course = self.find_course_by_id(
+                course_id=course_id, session=session, for_update=True)
             if not course or course.isDestroyed:
                 raise HTTPException(
                     status_code=404, detail="Course not found")
@@ -172,9 +178,12 @@ class CourseService:
                 raise HTTPException(
                     status_code=400, detail="This course is not open for registration at the current time")
 
-            existing_payment = self.payment_service.find_payment_by_target_id(
+            existing_payment = self.payment_service.find_payment_by_target_id_and_user_id(
                 target_id=course.id,
-                session=session
+                target_type=PaymentTargetTypeEnum.COURSE,
+                user_id=actant_id,
+                session=session,
+                for_update=True
             )
 
             # 결제된 수강만 취소 가능
@@ -193,7 +202,46 @@ class CourseService:
 
             return PaymentRead.model_validate(payment)
         except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(
+                status_code=getattr(e, "status_code", 500),
+                detail=str(e)
+            )
+
+    def complete_course(self, course_id: str, actant_id: str, session: Session) -> CourseRead:
+        try:
+            course = self.find_course_by_id(
+                course_id=course_id, session=session, for_update=True)
+            if not course or course.isDestroyed:
+                raise HTTPException(
+                    status_code=404, detail="Course not found")
+
+            existing_payment = self.payment_service.find_payment_by_target_id_and_user_id(
+                target_id=course.id,
+                target_type=PaymentTargetTypeEnum.COURSE,
+                user_id=actant_id,
+                session=session,
+                for_update=True
+            )
+
+            if existing_payment and existing_payment.status != PaymentStatusEnum.PAID:
+                raise HTTPException(
+                    status_code=409, detail="Cannot complete not paid Course")
+
+            existing_registration = self.payment_service.course_registration_service.find_registration_by_target_id_and_payment_id(
+                target_id=existing_payment.targetId, payment_id=existing_payment.id, session=session, for_update=True)
+
+            registration_update = CourseRegistrationUpdate(
+                status=CourseRegistrationStatusEnum.COMPLETED, updatedAt=datetime.now(timezone.utc))
+
+            self.payment_service.course_registration_service.update_registration(
+                registration_id=existing_registration.id, registration_update=registration_update, session=session)
+
+            return CourseRead.model_validate(course)
+        except Exception as e:
+            raise HTTPException(
+                status_code=getattr(e, "status_code", 500),
+                detail=str(e)
+            )
 
     def bulk_update_course(self, course_updates: list[tuple[int, CourseUpdate]], session: Session):
         try:
@@ -204,4 +252,7 @@ class CourseService:
                 results.append(updated_course)
             return results
         except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(
+                status_code=getattr(e, "status_code", 500),
+                detail=str(e)
+            )

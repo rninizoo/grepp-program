@@ -4,9 +4,11 @@ from fastapi import HTTPException
 from sqlmodel import Session, asc, desc, select
 
 from ...entities.payments import PaymentStatusEnum, PaymentTargetTypeEnum
+from ...entities.test_registration import TestRegistrationStatusEnum
 from ...entities.tests import Test
 from ...features.payments.schemas import PaymentApplyTest, PaymentCreate, PaymentRead
 from ...features.payments.service import PaymentService
+from ...features.test_registration.schemas import TestRegistrationUpdate
 from .schemas import TestCreate, TestQueryOpts, TestRead, TestUpdate
 
 
@@ -41,8 +43,9 @@ class TestService:
         session.refresh(test)
         return test
 
-    def find_test_by_id(self, id: str, session: Session, for_update: bool = False) -> Test | None:
-        stmt = select(Test).where(Test.id == id, Test.isDestroyed.is_(False))
+    def find_test_by_id(self, test_id: str, session: Session, for_update: bool = False) -> Test | None:
+        stmt = select(Test).where(Test.id == test_id,
+                                  Test.isDestroyed.is_(False))
 
         if for_update:
             stmt = stmt.with_for_update()  # 여기서 FOR UPDATE 적용
@@ -97,7 +100,8 @@ class TestService:
     def apply_test(self, test_id: str, payment_apply_test: PaymentApplyTest, actant_id: str, session: Session) -> PaymentRead:
 
         try:
-            test = self.find_test_by_id(test_id, session, True)
+            test = self.find_test_by_id(
+                test_id=test_id, session=session, for_update=True)
             if not test or test.isDestroyed:
                 raise HTTPException(
                     status_code=404, detail="Test not found")
@@ -152,12 +156,16 @@ class TestService:
 
             return PaymentRead.model_validate(payment)
         except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(
+                status_code=getattr(e, "status_code", 500),
+                detail=str(e)
+            )
 
     def cancel_test(self, test_id: str, actant_id: str, session: Session) -> PaymentRead:
 
         try:
-            test = self.find_test_by_id(test_id, session, True)
+            test = self.find_test_by_id(
+                test_id=test_id, session=session, for_update=True)
             if not test or test.isDestroyed:
                 raise HTTPException(
                     status_code=404, detail="Test not found")
@@ -187,7 +195,45 @@ class TestService:
 
             return PaymentRead.model_validate(payment)
         except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(
+                status_code=getattr(e, "status_code", 500),
+                detail=str(e)
+            )
+
+    def complete_test(self, test_id: str, actant_id: str, session: Session) -> TestRead:
+        try:
+            test = self.find_test_by_id(
+                test_id=test_id, session=session, for_update=True)
+            if not test or test.isDestroyed:
+                raise HTTPException(
+                    status_code=404, detail="Test not found")
+
+            existing_payment = self.payment_service.find_payment_by_target_id_and_user_id(
+                target_id=test.id,
+                target_type=PaymentTargetTypeEnum.TEST,
+                user_id=actant_id,
+                session=session,
+                for_update=True
+            )
+
+            if existing_payment and existing_payment.status != PaymentStatusEnum.PAID:
+                raise HTTPException(
+                    status_code=409, detail="Cannot complete not paid Test")
+            existing_registration = self.payment_service.test_registration_service.find_registration_by_target_id_and_payment_id(
+                target_id=existing_payment.targetId, payment_id=existing_payment.id, session=session, for_update=True)
+
+            registration_update = TestRegistrationUpdate(
+                status=TestRegistrationStatusEnum.COMPLETED, updatedAt=datetime.now(timezone.utc))
+
+            self.payment_service.test_registration_service.update_registration(
+                registration_id=existing_registration.id, registration_update=registration_update, session=session)
+
+            return TestRead.model_validate(test)
+        except Exception as e:
+            raise HTTPException(
+                status_code=getattr(e, "status_code", 500),
+                detail=str(e)
+            )
 
     def bulk_update_test(self, test_updates: list[tuple[int, TestUpdate]], session: Session):
         try:
@@ -198,4 +244,7 @@ class TestService:
                 results.append(updated_test)
             return results
         except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(
+                status_code=getattr(e, "status_code", 500),
+                detail=str(e)
+            )

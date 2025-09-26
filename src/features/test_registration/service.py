@@ -67,7 +67,7 @@ class TestRegistrationService:
             )
         return TestRegistrationRead.model_validate(registration)
 
-    def update_registration(self,  registration_id: str,   registration_update: TestRegistrationUpdate,   session: Session, for_update: bool = False) -> TestRegistrationRead:
+    def update_registration(self,  registration_id: str,   registration_update: TestRegistrationUpdate, session: Session, for_update: bool = False) -> TestRegistrationRead:
         stmt = select(TestRegistration).where(
             TestRegistration.id == registration_id,
             TestRegistration.isDestroyed.is_(False)

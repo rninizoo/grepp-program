@@ -53,7 +53,7 @@ class PaymentUpdate(SQLModel):
     cancelledAt: datetime | None = None
     validFrom: date | None = None
     validTo: date | None = None
-    isDestroyed: bool | None = None
+    isDestroyed: bool | None = False
 
 
 class PaymentApplyTest(SQLModel):
