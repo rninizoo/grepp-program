@@ -145,7 +145,7 @@ class CourseService:
             payment = self.payment_service.create_payment(
                 payment_create=payment_create, user_id=actant_id, session=session)
 
-            # 응시인원 증가
+            # 수강인원 증가
             course_update = CourseUpdate(
                 studentCount=course.studentCount + 1)
             self.update_course(
@@ -163,7 +163,7 @@ class CourseService:
                 raise HTTPException(
                     status_code=404, detail="Course not found")
 
-            # 응시완료(CourseRegistration.Status = true) 상태이면 취소 불가
+            # 수강완료(CourseRegistration.Status = true) 상태이면 취소 불가
             if not (course.startAt <= date.today() <= course.endAt):
                 raise HTTPException(
                     status_code=400, detail="This course is not open for registration at the current time")
@@ -173,7 +173,7 @@ class CourseService:
                 session=session
             )
 
-            # 결제된 응시만 취소 가능
+            # 결제된 수강만 취소 가능
             if existing_payment and existing_payment.status != PaymentStatusEnum.PAID:
                 raise HTTPException(
                     status_code=400, detail="Already payment applied Course")
@@ -188,7 +188,7 @@ class CourseService:
             payment = self.payment_service.update_payment(
                 payment_id=existing_payment.id, payment_update=payment_update, user_id=actant_id, session=session)
 
-            # 응시인원 감소
+            # 수강인원 감소
             course_update = CourseUpdate(
                 studentCount=course.studentCount - 1)
             self.update_course(
