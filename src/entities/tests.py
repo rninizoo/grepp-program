@@ -29,8 +29,8 @@ class Test(BaseModel, table=True):
     createdAt: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc))
     updatedAt: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
         sa_column_kwargs={"onupdate": lambda: datetime.now(timezone.utc)},
+        nullable=True,
     )
     actantId: str = Field(foreign_key="users.id", nullable=False)
     status: TestStatusEnum = Field(nullable=False)

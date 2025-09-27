@@ -39,7 +39,7 @@ class CourseRead(SQLModel):
     endAt: datetime
     status: CourseStatusEnum
     createdAt: datetime
-    updatedAt: datetime
+    updatedAt: datetime | None = None
     cost: int
     studentCount: int
     actantId: str
