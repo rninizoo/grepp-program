@@ -1,13 +1,18 @@
 
-from sqlmodel import SQLModel
+from sqlmodel import SQLModel  # noqa: I001
 
-from .database import engine, get_session
+from ..entities.users import User
+from ..entities.courses import Course
+from ..entities.tests import Test
+from .database import engine
 from .seed import seed_courses_and_tests, seed_users
 
 
 def init_db():
-    SQLModel.metadata.create_all(engine)
+    SQLModel.metadata.create_all(engine, tables=[User.__table__])
+    # 그 다음 courses, tests 테이블 생성
+    SQLModel.metadata.create_all(
+        engine, tables=[Course.__table__, Test.__table__])
 
-    with next(get_session()) as session:
-        seed_users(session)
-        seed_courses_and_tests(session)
+    seed_users(engine)
+    seed_courses_and_tests(engine)
