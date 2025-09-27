@@ -40,7 +40,7 @@ class TestRead(SQLModel):
     status: TestStatusEnum
     isDestroyed: bool
     createdAt: datetime
-    updatedAt: datetime
+    updatedAt: datetime | None = None
     examineeCount: int
     cost: int
     actantId: str

@@ -10,6 +10,8 @@ from tqdm import tqdm
 
 from ..entities.courses import CourseStatusEnum
 from ..entities.tests import TestStatusEnum
+from ..shared.security import hash_password
+from .config import settings
 
 BATCH_SIZE = 50000  # COPY 한 번에 처리할 건수
 
@@ -23,8 +25,9 @@ def seed_users(engine: Engine, user_count: int = 10):
             return
 
     now = datetime.now(timezone.utc)
+    password = hash_password(settings.INITIAL_PASSWORD)
     users = [{"id": str(ulid.new()), "username": f"user{i+1}",
-              "email": f"user{i+1}@example.com", "password": "password",
+              "email": f"user{i+1}@example.com", "password": password,
               "createdAt": now,  "isDestroyed": False} for i in range(user_count)]
 
     output = StringIO()
