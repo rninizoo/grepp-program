@@ -45,7 +45,7 @@ def create_course(
 
 @router.patch("/{course_id}", response_model=CourseRead)
 def update_course(
-    course_id: int,
+    course_id: str,
     credentials: HTTPAuthorizationCredentials = Depends(security),
     auth_service: AuthService = Depends(get_auth_service),
     service: service.CourseService = Depends(get_course_service),
@@ -58,7 +58,7 @@ def update_course(
 
 @router.post("/{course_id}/apply", response_model=PaymentRead)
 def apply_course(
-    course_id: int,
+    course_id: str,
     payment_apply_course: PaymentApplyCourse = Body(...),
     credentials: HTTPAuthorizationCredentials = Depends(security),
     auth_service: AuthService = Depends(get_auth_service),
@@ -68,3 +68,16 @@ def apply_course(
     current_user = auth_service.get_my_by_token(
         credentials.credentials, session=session)
     return course_service.apply_course(course_id=course_id, payment_apply_course=payment_apply_course, actant_id=current_user['id'], session=session)
+
+
+@router.post("/{course_id}/complete", response_model=CourseRead)
+def complete_course_registration(
+    course_id: str,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    auth_service: AuthService = Depends(get_auth_service),
+    session: Session = Depends(get_session),
+    course_service: service.CourseService = Depends(get_course_service),
+):
+    current_user = auth_service.get_my_by_token(
+        credentials.credentials, session=session)
+    return course_service.complete_course(course_id=course_id, actant_id=current_user['id'], session=session)

@@ -1,6 +1,7 @@
 from datetime import date, datetime, timezone
 from enum import Enum
 
+import ulid
 from sqlmodel import CheckConstraint, Field
 
 from .base import BaseModel
@@ -19,7 +20,8 @@ class Test(BaseModel, table=True):
                         name="check_examinee_count_positive"),
     )
 
-    id: int | None = Field(default=None, primary_key=True)
+    id: str = Field(default_factory=lambda: str(
+        ulid.new()), primary_key=True, index=True)
     title: str
     description: str | None = None
     startAt: date = Field(nullable=False)
@@ -30,7 +32,7 @@ class Test(BaseModel, table=True):
         default_factory=lambda: datetime.now(timezone.utc),
         sa_column_kwargs={"onupdate": lambda: datetime.now(timezone.utc)},
     )
-    actantId: int = Field(foreign_key="user.id", nullable=False)
+    actantId: str = Field(foreign_key="users.id", nullable=False)
     status: TestStatusEnum = Field(nullable=False)
     cost: int = Field(nullable=False)
     examineeCount: int = Field(default=0)

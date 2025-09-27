@@ -8,7 +8,7 @@ class UserCreate(SQLModel):
 
 
 class UserRead(SQLModel):
-    id: int
+    id: str
     username: str
     email: str
     isDestroyed: bool

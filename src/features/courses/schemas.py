@@ -28,11 +28,11 @@ class CourseUpdate(SQLModel):
     endAt: date | None = None
     status: CourseStatusEnum | None = None
     cost: int | None = None
-    isDestroyed: bool | None = None
+    isDestroyed: bool | None = False
 
 
 class CourseRead(SQLModel):
-    id: int
+    id: str
     title: str
     description: str
     startAt: datetime
@@ -42,5 +42,5 @@ class CourseRead(SQLModel):
     updatedAt: datetime
     cost: int
     studentCount: int
-    actantId: int
+    actantId: str
     isDestroyed: bool

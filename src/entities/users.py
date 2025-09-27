@@ -1,10 +1,14 @@
 from datetime import datetime, timezone
 
+import ulid
 from sqlmodel import Field, SQLModel
 
 
 class User(SQLModel, table=True):
-    id: int = Field(default=None, primary_key=True)
+    __tablename__ = "users"
+
+    id: str = Field(default_factory=lambda: str(
+        ulid.new()), primary_key=True, index=True)
     username: str = Field(index=True)
     email: str = Field(unique=True, index=True)
     password: str = Field(nullable=False)

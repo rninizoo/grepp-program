@@ -1,6 +1,7 @@
 from datetime import date, datetime, timezone
 from enum import Enum
 
+import ulid
 from sqlmodel import Field, Index, SQLModel
 
 
@@ -31,15 +32,16 @@ class Payment(SQLModel, table=True):
         ),
     )
 
-    id: int = Field(default=None, primary_key=True)
-    userId: int = Field(foreign_key="user.id", nullable=False)
+    id: str = Field(default_factory=lambda: str(
+        ulid.new()), primary_key=True, index=True)
+    userId: str = Field(foreign_key="users.id", nullable=False)
 
     amount: int = Field(nullable=False)  # 단위: KRW
     method: PaymentMethodEnum = Field(nullable=True)
     status: PaymentStatusEnum = Field(nullable=False)
 
     targetType: PaymentTargetTypeEnum = Field(nullable=False)
-    targetId: int = Field(nullable=False)
+    targetId: str = Field(nullable=False)
     title: str = Field(nullable=False)
 
     paidAt: datetime | None = Field(default=None)
@@ -54,7 +56,6 @@ class Payment(SQLModel, table=True):
     )
     cancelledAt: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
-        sa_column_kwargs={"onupdate": lambda: datetime.now(timezone.utc)},
     )
 
     isDestroyed: bool = Field(default=False, nullable=False)

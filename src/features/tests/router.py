@@ -27,6 +27,7 @@ def get_tests(
     test_service: service.TestService = Depends(get_test_service),
 ):
     query_opts = TestQueryOpts(status=status, sort=sort)
+
     return test_service.find_tests(skip=skip, limit=limit, query_opts=query_opts, session=session)
 
 
@@ -40,12 +41,13 @@ def create_test(
 ):
     current_user = auth_service.get_my_by_token(
         credentials.credentials, session=session)
+
     return test_service.create_test(test_create=test_create, actant_id=current_user["id"], session=session)
 
 
 @router.patch("/{test_id}", response_model=TestRead)
 def update_test(
-    test_id: int,
+    test_id: str,
     test_update: TestUpdate = Body(...),
     credentials: HTTPAuthorizationCredentials = Depends(security),
     auth_service: AuthService = Depends(get_auth_service),
@@ -54,6 +56,7 @@ def update_test(
 ):
     auth_service.get_my_by_token(
         credentials.credentials, session=session)
+
     return test_service.update_test(
         test_id=test_id, test_update=test_update, session=session
     )
@@ -61,7 +64,7 @@ def update_test(
 
 @router.post("/{test_id}/apply", response_model=PaymentRead)
 def apply_test(
-    test_id: int,
+    test_id: str,
     payment_apply_test: PaymentApplyTest = Body(...),
     credentials: HTTPAuthorizationCredentials = Depends(security),
     auth_service: AuthService = Depends(get_auth_service),
@@ -71,3 +74,16 @@ def apply_test(
     current_user = auth_service.get_my_by_token(
         credentials.credentials, session=session)
     return test_service.apply_test(test_id=test_id, payment_apply_test=payment_apply_test, actant_id=current_user['id'], session=session)
+
+
+@router.post("/{test_id}/complete", response_model=TestRead)
+def complete_test_registration(
+    test_id: str,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    auth_service: AuthService = Depends(get_auth_service),
+    session: Session = Depends(get_session),
+    test_service: service.TestService = Depends(get_test_service),
+):
+    current_user = auth_service.get_my_by_token(
+        credentials.credentials, session=session)
+    return test_service.complete_test(test_id=test_id, actant_id=current_user['id'], session=session)

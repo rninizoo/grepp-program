@@ -28,3 +28,19 @@ def paginate_my_payments(
     payments = payment_service.find_payments(session, skip, limit, query_opts)
     # 본인 결제만 필터링
     return [p for p in payments if p.userId == current_user['id']]
+
+
+@router.post("/{payment_id}/cancel", response_model=PaymentRead)
+def cancel_payments(
+    payment_id: str,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    auth_service: AuthService = Depends(get_auth_service),
+    session: Session = Depends(get_session),
+    payment_service: PaymentService = Depends(get_payment_service),
+):
+    current_user = auth_service.get_my_by_token(
+        credentials.credentials, session=session)
+    payment = payment_service.cancel_payment(
+        payment_id=payment_id, user_id=current_user['id'], session=session)
+
+    return payment

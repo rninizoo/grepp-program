@@ -42,7 +42,7 @@ class UserService:
             return None
         return found_user
 
-    def find_user_by_id(self, id: int, session: Session) -> User | None:
+    def find_user_by_id(self, id: str, session: Session) -> User | None:
         statement = select(User).where(
             User.id == id, User.isDestroyed.is_(False))
         found_user = session.exec(statement).first()

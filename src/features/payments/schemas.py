@@ -13,12 +13,12 @@ class PaymentQueryOpts(SQLModel):
 
 
 class PaymentCreate(SQLModel):
-    userId: int
+    userId: str
     amount: int
     method: PaymentMethodEnum | None = None
     status: PaymentStatusEnum
     targetType: PaymentTargetTypeEnum
-    targetId: int
+    targetId: str
     title: str
     paidAt: datetime | None = None
     validFrom: date
@@ -26,13 +26,13 @@ class PaymentCreate(SQLModel):
 
 
 class PaymentRead(SQLModel):
-    id: int
-    userId: int
+    id: str
+    userId: str
     amount: int
     method: PaymentMethodEnum | None = None
     status: PaymentStatusEnum  # noqa: F821
     targetType: PaymentTargetTypeEnum
-    targetId: int
+    targetId: str
     title: str
     paidAt: datetime | None = None
     validFrom: date
@@ -47,13 +47,13 @@ class PaymentUpdate(SQLModel):
     method: PaymentMethodEnum | None = None
     status: PaymentStatusEnum | None = None
     targetType: PaymentTargetTypeEnum | None = None
-    targetId: int | None = None
+    targetId: str | None = None
     title: str | None = None
     paidAt: datetime | None = None
     cancelledAt: datetime | None = None
     validFrom: date | None = None
     validTo: date | None = None
-    isDestroyed: bool | None = None
+    isDestroyed: bool | None = False
 
 
 class PaymentApplyTest(SQLModel):
