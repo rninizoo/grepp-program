@@ -52,13 +52,23 @@ def seed_users(engine: Engine, user_count: int = 10):
 def seed_courses_and_tests(engine: Engine, course_count: int = 1000000, test_count: int = 1000000):
     print("Seeding courses and tests...")
 
-    # Users ID 가져오기
+    # Users ID 가져오기, Skip 체크
     with engine.connect() as conn:
-        result = conn.execute(
-            text('SELECT id FROM users WHERE "isDestroyed" = false'))
-        user_ids = [row[0] for row in result.fetchall()]
+        # 활성 유저 조회
+        user_ids = [row[0] for row in conn.execute(
+            text('SELECT id FROM users WHERE "isDestroyed" = false')
+        ).fetchall()]
         if not user_ids:
             raise ValueError("No users found. Seed users first.")
+
+        # Courses, Test 체크
+        course_scalar = conn.execute(
+            text("SELECT COUNT(*) FROM courses")).scalar()
+        test_scalar = conn.execute(text("SELECT COUNT(*) FROM tests")).scalar()
+
+        if course_scalar >= 10000 and test_scalar >= 10000:
+            print("Courses and Test already exist. Skipping seeding.")
+            return
 
     now = datetime.now(timezone.utc)
 

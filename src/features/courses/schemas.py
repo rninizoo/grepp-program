@@ -4,6 +4,7 @@ from typing import Literal
 from sqlmodel import SQLModel
 
 from ...entities.courses import CourseStatusEnum
+from ...features.course_registration.schemas import CourseRegistrationStatusEnum
 
 
 class CourseQueryOpts(SQLModel):
@@ -44,3 +45,20 @@ class CourseRead(SQLModel):
     studentCount: int
     actantId: str
     isDestroyed: bool
+
+
+class CourseRowRead(SQLModel, table=False):
+    id: str
+    title: str
+    description: str
+    startAt: datetime
+    endAt: datetime
+    status: CourseStatusEnum
+    createdAt: datetime
+    updatedAt: datetime | None = None
+    cost: int
+    studentCount: int
+    actantId: str
+    isDestroyed: bool
+    registrationStatus: CourseRegistrationStatusEnum | None = None
+    isRegistered: bool | None = False

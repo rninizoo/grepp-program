@@ -1,15 +1,16 @@
 from datetime import date, datetime, timezone
 
 from fastapi import HTTPException
-from sqlmodel import Session, asc, desc, select
+from sqlalchemy.orm import aliased
+from sqlmodel import Session, asc, case, desc, select
 
-from ...entities.course_registration import CourseRegistrationStatusEnum
+from ...entities.course_registration import CourseRegistration, CourseRegistrationStatusEnum
 from ...entities.courses import Course
 from ...entities.payments import PaymentStatusEnum, PaymentTargetTypeEnum
 from ...features.course_registration.schemas import CourseRegistrationUpdate
 from ...features.payments.schemas import PaymentApplyCourse, PaymentCreate, PaymentRead
 from ...features.payments.service import PaymentService
-from .schemas import CourseCreate, CourseQueryOpts, CourseRead, CourseUpdate
+from .schemas import CourseCreate, CourseQueryOpts, CourseRead, CourseRowRead, CourseUpdate
 
 
 class CourseService:
@@ -43,8 +44,40 @@ class CourseService:
         session.refresh(course)
         return course
 
-    def find_courses(self, session: Session, skip: int, limit: int, query_opts: CourseQueryOpts) -> list[CourseRead]:
-        stmt = select(Course).where(Course.isDestroyed.is_(False))
+    def find_courses(self, session: Session, skip: int, limit: int, actant_id: str, query_opts: CourseQueryOpts) -> list[CourseRowRead]:  # noqa: F821
+        CR = aliased(CourseRegistration)
+        # registrationStatus 계산
+        registration_status_case = case(
+            (
+                (CR.id.is_not(None) & (CR.isDestroyed.is_(False))),
+                CR.status
+            ),
+            else_=None
+        ).label("registrationStatus")
+
+        # isRegistered 계산
+        is_registered_case = case(
+            (
+                (CR.id.is_not(None) & (CR.isDestroyed.is_(False))),
+                True
+            ),
+            else_=False
+        ).label("isRegistered")
+
+        # 기본 쿼리
+        stmt = (
+            select(
+                Course,
+                registration_status_case,
+                is_registered_case
+            )
+            .join(
+                CR,
+                (CR.courseId == Course.id) & (CR.userId == actant_id),
+                isouter=True
+            )
+            .where(Course.isDestroyed.is_(False))
+        )
 
         # status 필터링
         if query_opts.status:
@@ -59,8 +92,16 @@ class CourseService:
         # offset, limit
         stmt = stmt.offset(skip).limit(limit)
 
-        courses = session.exec(stmt).all()
-        return [CourseRead.model_validate(course) for course in courses]
+        results = session.exec(stmt).all()
+        courses_with_registration: list[CourseRowRead] = []
+
+        for course, registration_status, is_registered in results:
+            course_data = CourseRowRead.model_validate(course)
+            course_data.registrationStatus = registration_status
+            course_data.isRegistered = is_registered
+            courses_with_registration.append(course_data)
+
+        return courses_with_registration
 
     def find_course_by_id(self, course_id: str, session: Session, for_update: bool = False) -> Course | None:
         stmt = select(Course).where(Course.id == course_id,
@@ -196,7 +237,7 @@ class CourseService:
 
             # 수강인원 감소
             course_update = CourseUpdate(
-                studentCount=course.studentCount - 1)
+                studentCount=int(course.studentCount) - 1)
             self.update_course(
                 course_id=course.id, course_update=course_update, session=session)
 
@@ -224,8 +265,12 @@ class CourseService:
             )
 
             if existing_payment and existing_payment.status != PaymentStatusEnum.PAID:
-                raise HTTPException(
-                    status_code=409, detail="Cannot complete not paid Course")
+                if existing_payment and existing_payment.status == PaymentStatusEnum.CANCELLED:
+                    raise HTTPException(
+                        status_code=409, detail="Cannot Complete cancelled Course")
+                if existing_payment and existing_payment.status == PaymentStatusEnum.PENDING:
+                    raise HTTPException(
+                        status_code=409, detail="Cannot Complete not-paid Course")
 
             existing_registration = self.payment_service.course_registration_service.find_registration_by_target_id_and_payment_id(
                 target_id=existing_payment.targetId, payment_id=existing_payment.id, session=session, for_update=True)
