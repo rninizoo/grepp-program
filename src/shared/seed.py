@@ -65,8 +65,10 @@ def seed_courses_and_tests(engine: Engine, course_count: int = 1000000, test_cou
         course_scalar = conn.execute(
             text("SELECT COUNT(*) FROM courses")).scalar()
         test_scalar = conn.execute(text("SELECT COUNT(*) FROM tests")).scalar()
-        if course_scalar >= 10000 & test_scalar >= 10000:
+
+        if course_scalar >= 10000 and test_scalar >= 10000:
             print("Courses and Test already exist. Skipping seeding.")
+            return
 
     now = datetime.now(timezone.utc)
 
