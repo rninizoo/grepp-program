@@ -61,16 +61,17 @@ def seed_courses_and_tests(engine: Engine, course_count: int = 1000000, test_cou
         if not user_ids:
             raise ValueError("No users found. Seed users first.")
 
+        # Courses, Test 체크
+        course_scalar = conn.execute(
+            text("SELECT COUNT(*) FROM courses")).scalar()
+        test_scalar = conn.execute(text("SELECT COUNT(*) FROM tests")).scalar()
+        if course_scalar >= 10000 & test_scalar >= 10000:
+            print("Courses and Test already exist. Skipping seeding.")
+
     now = datetime.now(timezone.utc)
+
     # Courses
     print("Seeding courses...")
-    # Courses 체크
-    course_scalar = conn.execute(
-        text("SELECT COUNT(*) FROM courses")).scalar()
-    if course_scalar >= 10000:
-        print("Courses already exist. Skipping course seeding.")
-        return
-
     output = StringIO()
     writer = csv.writer(output)
     for i in tqdm(range(course_count), desc="Courses"):
@@ -98,12 +99,6 @@ def seed_courses_and_tests(engine: Engine, course_count: int = 1000000, test_cou
 
     # Tests
     print("Seeding tests...")
-    # Tests 체크
-    test_scalar = conn.execute(text("SELECT COUNT(*) FROM tests")).scalar()
-    if test_scalar >= 10000:
-        print("Tests already exist. Skipping test seeding.")
-        return
-
     output = StringIO()
     writer = csv.writer(output)
     for i in tqdm(range(test_count), desc="Tests"):
