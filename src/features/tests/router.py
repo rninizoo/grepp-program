@@ -11,13 +11,15 @@ from ...features.payments.schemas import PaymentApplyTest, PaymentRead
 from ...shared.database import get_session
 from ...shared.security import security
 from . import service
-from .schemas import TestCreate, TestQueryOpts, TestRead, TestUpdate
+from .schemas import TestCreate, TestQueryOpts, TestRead, TestRowRead, TestUpdate
 
 router = APIRouter(prefix="/tests", tags=["tests"])
 
 
 @router.get("", response_model=list[TestRead])
 def get_tests(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    auth_service: AuthService = Depends(get_auth_service),
     status: str = Query("AVAILABLE", description="Filter by test status"),
     sort: Literal["created", "popular"] = Query(
         "created", description="Sort by created or popular"),
@@ -25,10 +27,12 @@ def get_tests(
     limit: int = 100,
     session: Session = Depends(get_session),
     test_service: service.TestService = Depends(get_test_service),
-):
+) -> list[TestRowRead]:
+    current_user = auth_service.get_my_by_token(
+        credentials.credentials, session=session)
     query_opts = TestQueryOpts(status=status, sort=sort)
 
-    return test_service.find_tests(skip=skip, limit=limit, query_opts=query_opts, session=session)
+    return test_service.get_tests(skip=skip, limit=limit, actant_id=current_user["id"], query_opts=query_opts, session=session)
 
 
 @router.post("", response_model=TestRead)

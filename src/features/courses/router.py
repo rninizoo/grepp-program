@@ -11,13 +11,15 @@ from ...features.payments.schemas import PaymentApplyCourse, PaymentRead
 from ...shared.database import get_session
 from ...shared.security import security
 from . import service
-from .schemas import CourseCreate, CourseQueryOpts, CourseRead, CourseUpdate
+from .schemas import CourseCreate, CourseQueryOpts, CourseRead, CourseRowRead, CourseUpdate
 
 router = APIRouter(prefix="/courses", tags=["courses"])
 
 
 @router.get("", response_model=list[CourseRead])
 def get_courses(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    auth_service: AuthService = Depends(get_auth_service),
     service: service.CourseService = Depends(get_course_service),
     status: str = Query("AVAILABLE", description="Filter by Course status"),
     sort: Literal["created", "popular"] = Query(
@@ -25,9 +27,12 @@ def get_courses(
     skip: int = 0,
     limit: int = 100,
     session: Session = Depends(get_session),
-):
+) -> list[CourseRowRead]:
+    current_user = auth_service.get_my_by_token(
+        credentials.credentials, session=session)
     query_opts = CourseQueryOpts(status=status, sort=sort)
-    return service.find_courses(session=session, skip=skip, limit=limit, query_opts=query_opts)
+
+    return service.find_courses(session=session, skip=skip, limit=limit, actant_id=current_user['id'], query_opts=query_opts)
 
 
 @router.post("", response_model=CourseRead)

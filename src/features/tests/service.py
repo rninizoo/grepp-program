@@ -1,15 +1,16 @@
 from datetime import date, datetime, timezone
 
 from fastapi import HTTPException
-from sqlmodel import Session, asc, desc, select
+from sqlalchemy.orm import aliased
+from sqlmodel import Session, asc, case, desc, select
 
 from ...entities.payments import PaymentStatusEnum, PaymentTargetTypeEnum
-from ...entities.test_registration import TestRegistrationStatusEnum
+from ...entities.test_registration import TestRegistration, TestRegistrationStatusEnum
 from ...entities.tests import Test
 from ...features.payments.schemas import PaymentApplyTest, PaymentCreate, PaymentRead
 from ...features.payments.service import PaymentService
 from ...features.test_registration.schemas import TestRegistrationUpdate
-from .schemas import TestCreate, TestQueryOpts, TestRead, TestUpdate
+from .schemas import TestCreate, TestQueryOpts, TestRead, TestRowRead, TestUpdate
 
 
 class TestService:
@@ -53,24 +54,51 @@ class TestService:
         test = session.exec(stmt).first()
         return test
 
-    def find_tests(self, session: Session, skip: int, limit: int, query_opts: TestQueryOpts) -> list[TestRead]:
-        stmt = select(Test).where(Test.isDestroyed.is_(False))
+    def get_tests(self, session: Session, skip: int, limit: int, actant_id: str, query_opts: TestQueryOpts) -> list[TestRowRead]:
+        TR = aliased(TestRegistration)
 
-        # status 필터링
+        # registrationStatus 계산: 없으면 None, isDestroyed=True면 None, 아니면 실제 status
+        registration_status_case = case(
+            (TR.id.is_not(None) & (TR.isDestroyed.is_(False)), TR.status),
+            else_=None
+        ).label("registrationStatus")
+
+        # isRegistered: TR이 있고 isDestroyed=False면 True, 아니면 False
+        is_registered_case = case(
+            (TR.id.is_not(None) & (TR.isDestroyed.is_(False)), True),
+            else_=False
+        ).label("isRegistered")
+
+        stmt = (
+            select(Test, registration_status_case, is_registered_case)
+            .join(
+                TR,
+                (TR.testId == Test.id) & (TR.userId == actant_id),
+                isouter=True
+            )
+            .where(Test.isDestroyed.is_(False))
+        )
+
         if query_opts.status:
             stmt = stmt.where(Test.status == query_opts.status)
 
-        # 정렬 created | popular
         if query_opts.sort == "created":
             stmt = stmt.order_by(asc(Test.createdAt))
         elif query_opts.sort == "popular":
             stmt = stmt.order_by(desc(Test.examineeCount))
 
-        # offset, limit
         stmt = stmt.offset(skip).limit(limit)
 
-        tests = session.exec(stmt).all()
-        return [TestRead.model_validate(test) for test in tests]
+        results = session.exec(stmt).all()
+        tests_with_registration = []
+
+        for test, registration_status, is_registered in results:
+            test_data = TestRowRead.model_validate(test)
+            test_data.registrationStatus = registration_status
+            test_data.isRegistered = is_registered
+            tests_with_registration.append(test_data)
+
+        return tests_with_registration
 
     def update_test(self, test_id: str, test_update: TestUpdate, session: Session) -> TestRead:
         stmt = select(Test).where(Test.id == test_id).with_for_update()
@@ -217,8 +245,12 @@ class TestService:
             )
 
             if existing_payment and existing_payment.status != PaymentStatusEnum.PAID:
-                raise HTTPException(
-                    status_code=409, detail="Cannot complete not paid Test")
+                if existing_payment and existing_payment.status == PaymentStatusEnum.CANCELLED:
+                    raise HTTPException(
+                        status_code=409, detail="Cannot Complete cancelled Test")
+                if existing_payment and existing_payment.status == PaymentStatusEnum.PENDING:
+                    raise HTTPException(
+                        status_code=409, detail="Cannot Complete not-paid Test")
             existing_registration = self.payment_service.test_registration_service.find_registration_by_target_id_and_payment_id(
                 target_id=existing_payment.targetId, payment_id=existing_payment.id, session=session, for_update=True)
 
