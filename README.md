@@ -85,6 +85,6 @@ user10@example.com
 
 ---
 
-## 📂 Github Repository
+## Github Repository
 
 https://github.com/rninizoo/grepp-program
