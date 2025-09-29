@@ -16,7 +16,7 @@ from .schemas import CourseCreate, CourseQueryOpts, CourseRead, CourseRowRead, C
 router = APIRouter(prefix="/courses", tags=["courses"])
 
 
-@router.get("", response_model=list[CourseRead])
+@router.get("", response_model=list[CourseRowRead])
 def get_courses(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     auth_service: AuthService = Depends(get_auth_service),

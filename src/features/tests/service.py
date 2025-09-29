@@ -90,15 +90,8 @@ class TestService:
         stmt = stmt.offset(skip).limit(limit)
 
         results = session.exec(stmt).all()
-        tests_with_registration = []
 
-        for test, registration_status, is_registered in results:
-            test_data = TestRowRead.model_validate(test)
-            test_data.registrationStatus = registration_status
-            test_data.isRegistered = is_registered
-            tests_with_registration.append(test_data)
-
-        return tests_with_registration
+        return [TestRowRead.model_validate({**row.Test.model_dump(), "registrationStatus": row.registrationStatus, "isRegistered": row.isRegistered, }) for row in results]
 
     def update_test(self, test_id: str, test_update: TestUpdate, session: Session) -> TestRead:
         stmt = select(Test).where(Test.id == test_id).with_for_update()
@@ -261,20 +254,6 @@ class TestService:
                 registration_id=existing_registration.id, registration_update=registration_update, session=session)
 
             return TestRead.model_validate(test)
-        except Exception as e:
-            raise HTTPException(
-                status_code=getattr(e, "status_code", 500),
-                detail=str(e)
-            )
-
-    def bulk_update_test(self, test_updates: list[tuple[int, TestUpdate]], session: Session):
-        try:
-            results: list[TestRead] = []
-            for test_id, test_update in test_updates:
-                updated_test = self.update_test(
-                    test_id, test_update, session)
-                results.append(updated_test)
-            return results
         except Exception as e:
             raise HTTPException(
                 status_code=getattr(e, "status_code", 500),

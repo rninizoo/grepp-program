@@ -93,15 +93,8 @@ class CourseService:
         stmt = stmt.offset(skip).limit(limit)
 
         results = session.exec(stmt).all()
-        courses_with_registration: list[CourseRowRead] = []
 
-        for course, registration_status, is_registered in results:
-            course_data = CourseRowRead.model_validate(course)
-            course_data.registrationStatus = registration_status
-            course_data.isRegistered = is_registered
-            courses_with_registration.append(course_data)
-
-        return courses_with_registration
+        return [CourseRowRead.model_validate({**row.Course.model_dump(), "registrationStatus": row.registrationStatus, "isRegistered": row.isRegistered, }) for row in results]
 
     def find_course_by_id(self, course_id: str, session: Session, for_update: bool = False) -> Course | None:
         stmt = select(Course).where(Course.id == course_id,
@@ -210,11 +203,10 @@ class CourseService:
         try:
             course = self.find_course_by_id(
                 course_id=course_id, session=session, for_update=True)
-            if not course or course.isDestroyed:
+            if not course:
                 raise HTTPException(
                     status_code=404, detail="Course not found")
 
-            # 수강완료(CourseRegistration.Status = true) 상태이면 취소 불가
             if not (course.startAt <= date.today() <= course.endAt):
                 raise HTTPException(
                     status_code=400, detail="This course is not open for registration at the current time")
@@ -236,8 +228,7 @@ class CourseService:
                 payment_id=existing_payment.id, user_id=actant_id, session=session)
 
             # 수강인원 감소
-            course_update = CourseUpdate(
-                studentCount=int(course.studentCount) - 1)
+            course_update = CourseUpdate(studentCount=course.studentCount - 1)
             self.update_course(
                 course_id=course.id, course_update=course_update, session=session)
 
@@ -282,20 +273,6 @@ class CourseService:
                 registration_id=existing_registration.id, registration_update=registration_update, session=session)
 
             return CourseRead.model_validate(course)
-        except Exception as e:
-            raise HTTPException(
-                status_code=getattr(e, "status_code", 500),
-                detail=str(e)
-            )
-
-    def bulk_update_course(self, course_updates: list[tuple[int, CourseUpdate]], session: Session):
-        try:
-            results: list[CourseRead] = []
-            for course_id, course_update in course_updates:
-                updated_course = self.update_course(
-                    course_id, course_update, session)
-                results.append(updated_course)
-            return results
         except Exception as e:
             raise HTTPException(
                 status_code=getattr(e, "status_code", 500),

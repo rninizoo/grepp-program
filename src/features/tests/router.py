@@ -16,7 +16,7 @@ from .schemas import TestCreate, TestQueryOpts, TestRead, TestRowRead, TestUpdat
 router = APIRouter(prefix="/tests", tags=["tests"])
 
 
-@router.get("", response_model=list[TestRead])
+@router.get("", response_model=list[TestRowRead])
 def get_tests(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     auth_service: AuthService = Depends(get_auth_service),
