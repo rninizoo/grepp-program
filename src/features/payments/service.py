@@ -3,7 +3,9 @@ from datetime import datetime, time, timezone
 from fastapi import HTTPException
 from sqlmodel import Session, select
 
+from ...entities.courses import Course
 from ...entities.payments import Payment, PaymentStatusEnum, PaymentTargetTypeEnum
+from ...entities.tests import Test
 from ...features.course_registration.schemas import CourseRegistrationStatusEnum, CourseRegistrationUpdate
 from ...features.course_registration.service import CourseRegistrationService
 from ...features.test_registration.schemas import TestRegistrationStatusEnum, TestRegistrationUpdate
@@ -161,8 +163,30 @@ class PaymentService:
         registration_service.update_registration(registration_id=registration.id,
                                                  registration_update=registration_update, session=session)
 
+        # Course / Test 인원 감소
+        if payment.targetType == PaymentTargetTypeEnum.COURSE:
+            course = session.exec(
+                select(Course).where(Course.id ==
+                                     payment.targetId).with_for_update()
+            ).first()
+            if course:
+                course.studentCount = max(0, course.studentCount - 1)
+                course.updatedAt = datetime.now(timezone.utc)
+                session.add(course)
+
+        elif payment.targetType == PaymentTargetTypeEnum.TEST:
+            test = session.exec(
+                select(Test).where(
+                    Test.id == payment.targetId).with_for_update()
+            ).first()
+            if test:
+                test.examineeCount = max(0, test.examineeCount - 1)
+                test.updatedAt = datetime.now(timezone.utc)
+                session.add(test)
+
         session.flush()
         session.refresh(payment)
+
         return payment
 
     def find_payments(
@@ -247,17 +271,3 @@ class PaymentService:
         session.refresh(payment)
 
         return PaymentRead.model_validate(payment)
-
-    def bulk_update_payment(self, payment_updates: list[tuple[str, PaymentUpdate]], user_id: str, session: Session):
-        try:
-            results: list[PaymentRead] = []
-            for payment_id, payment_update in payment_updates:
-                updated_payment = self.update_payment(
-                    payment_id, payment_update, user_id, session)
-                results.append(updated_payment)
-            return results
-        except Exception as e:
-            raise HTTPException(
-                status_code=getattr(e, "status_code", 500),
-                detail=str(e)
-            )

@@ -4,6 +4,7 @@ from typing import Literal
 from sqlmodel import SQLModel
 
 from ...entities.tests import TestStatusEnum
+from ...features.test_registration.schemas import TestRegistrationStatusEnum
 
 
 class TestQueryOpts(SQLModel):
@@ -44,3 +45,20 @@ class TestRead(SQLModel):
     examineeCount: int
     cost: int
     actantId: str
+
+
+class TestRowRead(SQLModel, table=False):
+    id: str
+    title: str
+    description: str
+    startAt: date
+    endAt: date
+    status: TestStatusEnum
+    isDestroyed: bool
+    createdAt: datetime
+    updatedAt: datetime | None = None
+    examineeCount: int
+    cost: int
+    actantId: str
+    registrationStatus: TestRegistrationStatusEnum | None = None
+    isRegistered: bool | None = False
